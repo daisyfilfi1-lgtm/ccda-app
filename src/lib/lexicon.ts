@@ -39,12 +39,12 @@ export function updateMasteryAfterQuiz(word: string, correct: boolean): void {
   const entry = inMemoryLexicon.get(word);
   if (!entry) return;
 
-  entry.reviewCount++;
+  entry.reviewCount = (entry.reviewCount || 0) + 1;
   if (correct) {
-    entry.correctCount++;
+    entry.correctCount = (entry.correctCount || 0) + 1;
     entry.mastery = Math.min(100, entry.mastery + 10);
   } else {
-    entry.incorrectCount++;
+    entry.incorrectCount = (entry.incorrectCount || 0) + 1;
     entry.mastery = Math.max(0, entry.mastery - 5);
   }
   entry.lastReviewed = Date.now();
@@ -57,12 +57,12 @@ export function getReviewWords(dueCount: number = 5): LexiconEntry[] {
   // Sort by: lowest mastery first, then oldest review
   entries.sort((a, b) => {
     // Unreviewed words first
-    if (a.reviewCount === 0 && b.reviewCount > 0) return -1;
-    if (b.reviewCount === 0 && a.reviewCount > 0) return 1;
+    if ((a.reviewCount || 0) === 0 && (b.reviewCount || 0) > 0) return -1;
+    if ((b.reviewCount || 0) === 0 && (a.reviewCount || 0) > 0) return 1;
     // Then by mastery (lowest first)
     if (a.mastery !== b.mastery) return a.mastery - b.mastery;
     // Then by oldest review
-    return a.lastReviewed - b.lastReviewed;
+    return (a.lastReviewed || 0) - (b.lastReviewed || 0);
   });
 
   return entries.slice(0, dueCount);

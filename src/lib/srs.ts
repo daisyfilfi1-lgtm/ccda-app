@@ -96,7 +96,7 @@ function generateArticleContent(
     interestTags,
     generatedAt: Date.now(),
     wordCount: content.length / 2,
-    characterCount: content.length,
+    // characterCount: content.length,
   };
 }
 

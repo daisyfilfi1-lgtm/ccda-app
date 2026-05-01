@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { getClientAuth, getClientProfile, setClientProfile, createDefaultProfile } from '@/lib/auth';
-import { HskLevel, AssessmentQuestion, AssessmentResult } from '@/lib/types';
+import { HskLevel, AssessmentQuestion, AssessmentResult } from '@/lib/types/index';
 
 // Emoji-based assessment questions with adaptive difficulty
-const EMOJI_QUESTIONS: Record<number, AssessmentQuestion[]> = {
+const EMOJI_QUESTIONS: Record<number, any[]> = {
   1: [
     { id: 1, emoji: '🐱', word: '猫', options: ['狗', '猫', '鸟', '鱼'], correctIndex: 1, hskLevel: 1 },
     { id: 2, emoji: '🐶', word: '狗', options: ['猫', '鱼', '狗', '鸟'], correctIndex: 2, hskLevel: 1 },
@@ -66,7 +66,7 @@ export default function AssessmentPage() {
     return EMOJI_QUESTIONS[level].filter(q => !answeredIds.has(q.id));
   }, [answered]);
 
-  const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
 
   useEffect(() => {
     const auth = getClientAuth();
@@ -291,7 +291,7 @@ export default function AssessmentPage() {
 
           {/* Options */}
           <div className="grid grid-cols-2 gap-3">
-            {currentQuestion.options.map((option, index) => (
+            {currentQuestion.options.map((option: string, index: number) => (
               <button
                 key={index}
                 onClick={() => handleAnswer(index)}

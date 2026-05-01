@@ -6,7 +6,7 @@ import { getClientAuth, getClientProfile, updateClientProfile } from '@/lib/auth
 import { getTodayTask } from '@/lib/srs';
 import { generateQuiz, checkAnswer } from '@/lib/qc';
 import { updateMasteryAfterQuiz } from '@/lib/lexicon';
-import { QuizQuestion } from '@/lib/types';
+import { QuizQuestion } from '@/lib/types/index';
 
 export default function QuizPage() {
   const router = useRouter();

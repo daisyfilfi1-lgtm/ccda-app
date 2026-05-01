@@ -61,6 +61,9 @@ export function parseArticleFromResponse(
     interestTags: meta.interests,
     generatedAt: Date.now(),
     wordCount: content.length / 2,
-    characterCount: content.length,
+    body: content,
+    weakChars: [],
+    newChars: [],
+    // characterCount: content.length,
   };
 }

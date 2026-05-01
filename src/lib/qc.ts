@@ -12,7 +12,7 @@ export function generateQuiz(
   // Q1: Word meaning (4 choices)
   if (articleWords.length > 0) {
     const targetWord = articleWords[Math.floor(Math.random() * articleWords.length)];
-    const allWords = getWordsByLevel(targetWord.hskLevel);
+    const allWords = getWordsByLevel(targetWord.hskLevel as any);
     const distractors = allWords
       .filter(w => w.word !== targetWord.word)
       .sort(() => Math.random() - 0.5)
@@ -51,7 +51,7 @@ export function generateQuiz(
   // Q3: Fill in the blank
   if (articleWords.length > 0) {
     const fillWord = articleWords[Math.floor(Math.random() * articleWords.length)];
-    const allWords = getWordsByLevel(fillWord.hskLevel);
+    const allWords = getWordsByLevel(fillWord.hskLevel as any);
     const fillDistractors = allWords
       .filter(w => w.word !== fillWord.word)
       .sort(() => Math.random() - 0.5)

@@ -81,7 +81,7 @@ export default function DailyPage() {
       return;
     }
     setIsReading(true);
-    speakText(task.article.content, {
+    speakText(task.article.body || "", {
       lang: 'zh-CN',
       rate: 0.85,
       onEnd: () => setIsReading(false),
@@ -200,7 +200,7 @@ export default function DailyPage() {
 
             {/* Content with clickable words */}
             <div className="space-y-3 leading-relaxed text-lg">
-              {task.article.content.split('\n').filter(Boolean).map((line, i) => (
+              {(task.article.body || "").split('\n').filter(Boolean).map((line, i) => (
                 <p key={i} className="text-gray-700">
                   {line.split('').map((char, j) => {
                     const isChinese = /[\u4e00-\u9fff]/.test(char);
