@@ -1,53 +1,193 @@
 // DeepSeek API client for AI-powered article generation
-// Uses OpenAI-compatible format
+// v2 - Story-first generation with natural language, character-driven narratives
 
 import { Article, ChineseWord, HskLevel } from './types';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
-// Rich, contextually valid story templates for fallback
-const INTEREST_ARTICLE_TEMPLATES: Record<string, {
-  titles: string[];
-  templates: string[];
-}> = {
-  minecraft: {
-    titles: ['我的世界大冒险', '史蒂夫的新朋友', '苦力怕的生日', '钻石在哪里'],
-    templates: [
-      '今天，{player}在{place}玩。{player}看到了一只{animal}。{animal}说："你好！我们一起玩吧！"{player}很高兴，说："好的！"他们一起{action}，玩得很开心。',
-    ],
-  },
-  pokemon: {
-    titles: ['皮卡丘的一天', '宝可梦大冒险', '小智的新伙伴', '精灵球里的秘密'],
-    templates: [
-      '{player}有一只{animal}，它的名字叫{name}。{animal}喜欢{action}。有一天，{player}和{animal}去了{place}。在那里，他们遇到了{other}。{other}说："你们好！"他们一起{action}，成为了好朋友。',
-    ],
-  },
-  basketball: {
-    titles: ['篮球小明星', '第一次投篮', '球队的新成员', '胜利的一球'],
-    templates: [
-      '今天{player}去打篮球。{player}投了一个球，{result}。{coach}说："加油！你可以的！"{player}又投了一个球，{result}。{player}很高兴，说："我学会了！"',
-    ],
-  },
-  dinosaur: {
-    titles: ['恐龙世界', '霸王龙的朋友', '三角龙的大冒险', '恐龙蛋的秘密'],
-    templates: [
-      '在很久很久以前，有一只{animal}。它很大很大，有{number}个{bodyPart}那么大。{animal}喜欢吃{food}。有一天，{animal}在{place}遇到了{other}。{other}说："你好！"他们成为了朋友。',
-    ],
-  },
-};
+// --- Rich fallback story templates with character+plot structure ---
 
-const PLACES = ['公园', '学校', '山上', '河边', '森林', '草地', '海边', '花园'];
-const ANIMALS = ['小猫', '小狗', '小鸟', '小鱼', '兔子', '小熊', '大象', '猴子'];
-const ACTIONS = ['跑步', '跳舞', '唱歌', '画画', '看书', '玩游戏', '游泳', '骑车'];
-const NAMES = ['小明', '小红', '小华', '小丽', '小刚'];
-const FOODS = ['苹果', '面包', '牛奶', '蛋糕', '鸡蛋', '米饭', '面条', '水果'];
-const BODY_PARTS = ['头', '手', '脚', '眼睛', '耳朵', '嘴巴'];
-const OTHERS = ['一只小猫', '一只小狗', '一个小朋友', '一只小鸟', '一条小鱼'];
+const STORY_TEMPLATES: {
+  title: string;
+  setup: string;
+  problem: string;
+  resolution: string;
+}[] = [
+  {
+    title: '小明的秘密基地',
+    setup: '{player}在{place}发现了一个秘密的地方。那里有{object}和{object2}，非常漂亮。',
+    problem: '有一天，{friend}来了，{player}不知道该不该告诉{friend}这个秘密。',
+    resolution: '{player}想了想，决定和{friend}一起分享。他们成了最好的朋友。',
+  },
+  {
+    title: '森林里的比赛',
+    setup: '今天森林里要举行{event}比赛。{animal}和{animal2}都来参加了。',
+    problem: '{animal}跑得很快，但是{animal2}跳得很高。它们不知道谁更厉害。',
+    resolution: '{judge}说："你们都很棒！每个动物都有自己的本领。"大家都开心地笑了。',
+  },
+  {
+    title: '神奇的一天',
+    setup: '{player}早上醒来，发现窗外有一个{object}。{player}揉了揉眼睛，不敢相信。',
+    problem: '{player}想去看看，但是又有点害怕。{friend}说："别怕，我们一起去看。"',
+    resolution: '他们一起走出去，发现原来是{twist}！大家都笑了起来。',
+  },
+  {
+    title: '礼物',
+    setup: '今天是{person}的生日。{player}想送一个特别的礼物。',
+    problem: '{player}想了很久，不知道送什么好。{object}？{object2}？都不太对。',
+    resolution: '{player}决定自己动手做一个礼物。{person}收到后非常感动，说这是最好的礼物。',
+  },
+  {
+    title: '第一次尝试',
+    setup: '{player}从来没有{action}过，但是很想试一试。朋友们都说："加油！你可以的！"',
+    problem: '一开始，{player}总是做不好，有点想放弃了。',
+    resolution: '{coach}说："每个人都是从不会开始学的。" {player}又试了一次，终于成功了！',
+  },
+];
+
+interface StoryContext {
+  player: string;
+  friend: string;
+  animal: string;
+  animal2: string;
+  place: string;
+  object: string;
+  object2: string;
+  action: string;
+  event: string;
+  judge: string;
+  person: string;
+  coach: string;
+  twist: string;
+  food: string;
+}
+
+const ALL_NAMES = ['小明', '小红', '小华', '小丽', '小刚', '朵朵', '乐乐', '天天'];
+const ALL_PLACES = ['公园', '学校后院', '河边', '森林里', '草地上', '花园里', '山坡上', '图书馆'];
+const ALL_ANIMALS = ['小兔子', '小猫', '小狗', '小松鼠', '小刺猬', '小鸭子', '小熊猫', '小猴子'];
+const ALL_OBJECTS = ['一朵花', '一个盒子', '一颗星星', '一个气球', '一本书', '一幅画', '一个贝壳', '一块石头'];
+const ALL_ACTIONS = ['跑步', '跳绳', '踢球', '画画', '唱歌', '跳舞', '骑车', '游泳'];
+const ALL_EVENTS = ['跑步', '跳高', '画画', '唱歌'];
+const ALL_FOODS = ['苹果', '蛋糕', '面包', '饼干', '冰淇淋', '牛奶', '水果', '面条'];
 
 function randomPick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
+
+function generateStoryContext(): StoryContext {
+  return {
+    player: randomPick(ALL_NAMES),
+    friend: randomPick(ALL_NAMES.filter(n => n !== undefined)).trim() || randomPick(ALL_NAMES),
+    animal: randomPick(ALL_ANIMALS),
+    animal2: randomPick(ALL_ANIMALS.filter(a => a !== undefined)).trim() || randomPick(ALL_ANIMALS),
+    place: randomPick(ALL_PLACES),
+    object: randomPick(ALL_OBJECTS),
+    object2: randomPick(ALL_OBJECTS.filter(o => o !== undefined)).trim() || randomPick(ALL_OBJECTS),
+    action: randomPick(ALL_ACTIONS),
+    event: randomPick(ALL_EVENTS),
+    judge: '猫头鹰老师',
+    person: '妈妈',
+    coach: '爸爸',
+    twist: '一只小鸟在做梦',
+    food: randomPick(ALL_FOODS),
+  };
+}
+
+function injectWords(text: string, newWords: ChineseWord[], ctx: StoryContext): string {
+  if (newWords.length === 0) return text;
+
+  // Categorize words by type for natural insertion
+  const actionWords = newWords.filter(w => ALL_ACTIONS.includes(w.word));
+  const foodWords = newWords.filter(w => ALL_FOODS.includes(w.word));
+  const placeWords = newWords.filter(w => ALL_PLACES.some(p => p.includes(w.word)));
+  const otherWords = newWords.filter(w =>
+    !actionWords.includes(w) && !foodWords.includes(w) && !placeWords.includes(w)
+  );
+
+  let result = text;
+
+  // Insert action words
+  for (const w of actionWords) {
+    result += ` ${ctx.player}开心地${w.word}了起来。`;
+  }
+
+  // Insert food words
+  for (const w of foodWords) {
+    result += ` ${ctx.player}吃了美味的${w.word}，真好吃。`;
+  }
+
+  // Insert other words naturally
+  for (const w of otherWords) {
+    result += ` ${ctx.player}学会了"${w.word}"这个词语。`;
+  }
+
+  return result;
+}
+
+export function generateFallbackArticle(
+  hskLevel: HskLevel,
+  interestTags: string[],
+  newWords: ChineseWord[],
+  weakChars: string[],
+): Article {
+  // Pick a story template based on interests
+  const tag = interestTags[0]?.toLowerCase() || '';
+  let template;
+  if (tag.includes('minecraft') || tag.includes('游戏')) {
+    template = STORY_TEMPLATES[0]; // adventure
+  } else if (tag.includes('恐龙') || tag.includes('动物')) {
+    template = STORY_TEMPLATES[1]; // competition
+  } else if (tag.includes('篮球') || tag.includes('运动')) {
+    template = STORY_TEMPLATES[4]; // first try
+  } else {
+    template = randomPick(STORY_TEMPLATES);
+  }
+
+  const ctx = generateStoryContext();
+
+  let story = `${template.setup}\n\n${template.problem}\n\n${template.resolution}`;
+  story = injectWords(story, newWords, ctx);
+
+  // Fill template placeholders
+  story = story
+    .replace(/{player}/g, ctx.player)
+    .replace(/{friend}/g, ctx.friend)
+    .replace(/{animal}/g, ctx.animal)
+    .replace(/{animal2}/g, ctx.animal2)
+    .replace(/{place}/g, ctx.place)
+    .replace(/{object}/g, ctx.object)
+    .replace(/{object2}/g, ctx.object2)
+    .replace(/{action}/g, ctx.action)
+    .replace(/{event}/g, ctx.event)
+    .replace(/{judge}/g, ctx.judge)
+    .replace(/{person}/g, ctx.person)
+    .replace(/{coach}/g, ctx.coach)
+    .replace(/{twist}/g, ctx.twist)
+    .replace(/{food}/g, ctx.food);
+
+  // Insert weak chars
+  if (weakChars.length > 0) {
+    const chars = weakChars.slice(0, 3).join('、');
+    story += ` ${ctx.player}指着字说："${chars}，这些字我都认识！"`;
+  }
+
+  const title = template.title;
+
+  return {
+    id: `article_${Date.now()}`,
+    title,
+    content: `${title}\n\n${story}`,
+    words: newWords,
+    hskLevel,
+    interestTags,
+    generatedAt: Date.now(),
+    wordCount: story.length / 2,
+    characterCount: story.length,
+  };
+}
+
+// --- Prompt for DeepSeek API (story-first generation) ---
 
 function buildPrompt(
   hskLevel: HskLevel,
@@ -57,31 +197,31 @@ function buildPrompt(
   wordCountTarget: number,
 ): string {
   const interestStr = interestTags.length > 0 ? interestTags.join('、') : '日常生活';
-  const newWordsStr = newWords.length > 0 ? newWords.map(w => `${w.word}（${w.pinyin}，${w.meaning}）`).join('、') : '（无特定生词）';
+  const newWordsStr = newWords.length > 0
+    ? newWords.map(w => `${w.word}（${w.pinyin}，${w.meaning}）`).join('、')
+    : '（无特定生词）';
   const weakCharsStr = weakChars.length > 0 ? weakChars.slice(0, 10).join('、') : '（无）';
 
-  return `你是一位专门为海外华人儿童创作中文阅读材料的AI助手。请根据以下要求创作一篇中文短文：
+  return `你是一位优秀的儿童文学作家，专为海外华人儿童创作中文故事。
 
-【HSK等级】HSK ${hskLevel}级（适合中文${hskLevel === 1 ? '初学者，仅使用最简单词汇' :
-    hskLevel === 2 ? '初级学习者，使用基础词汇' :
-    hskLevel === 3 ? '初中级学习者' :
-    hskLevel === 4 ? '中级学习者' :
-    hskLevel === 5 ? '中高级学习者' : '高级学习者'}）
+请写一篇有趣的**故事**，要求：
+
+【读者水平】HSK ${hskLevel}级（适合${hskLevel === 1 ? '初学者' : hskLevel === 2 ? '初级' : hskLevel === 3 ? '初中级' : '中级'}水平的孩子独立阅读）
 
 【兴趣主题】${interestStr}
 
-【生词要求】请在文章中自然地包含以下生词（不要列表罗列，要在句子中自然使用）：${newWordsStr}
+【故事要求】
+1. 🎭 **有角色** — 给主人公起名字（小明/小红/小动物等），读者能代入
+2. 📖 **有情节** — 有简单的起承转合（遇到问题→解决→收获）
+3. 💡 **有知识或道理** — 在故事中自然传递一个小知识或小道理
+4. 🎯 **生词融入** — 把这些生词自然地编织进故事里（不要罗列）：${newWordsStr}
+5. 🔄 **弱字重复** — 适当重复这些字：${weakCharsStr}
+6. 📏 **字数** — 约${wordCountTarget}字
+7. ⛔ **不要**在一句话里堆砌多个生词，要把它们分散在故事的不同段落
 
-【薄弱字词】以下字词是用户薄弱项，请在文章中适当重复出现：${weakCharsStr}
-
-【字数要求】约${wordCountTarget}字
-
-【内容要求】
-1. 文章必须有趣、有故事性，符合儿童阅读习惯
-2. 使用简单自然的句子，适合目标HSK等级
-3. 生词要在上下文中自然出现，帮助理解。重要：不要在一句话里罗列多个生词，要把它们分布在文章不同位置
-4. 适当重复使用HSK ${hskLevel}级的常用词汇
-5. 返回格式为：标题：[文章标题] 内容：[文章正文]`;
+【返回格式】
+标题：[故事标题]
+内容：[正文]`;
 }
 
 function getApiKey(): string {
@@ -117,15 +257,15 @@ export async function createDailyArticle(
         messages: [
           {
             role: 'system',
-            content: '你是CCDA中文阅读助手，专为海外华人儿童创作有趣的中文故事。你的回复必须简洁，只输出标题和正文。注意：不要把生词堆砌在一句话里，要分布在文章各处。',
+            content: '你是一位专为海外华人儿童写故事的AI作家。每次创作一个完整的短篇故事，要有角色、有情节、有温度。生词要自然地分布在故事的不同位置，不要集中在一句话里。故事要有教育意义或传递正能量。',
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        temperature: 0.8,
-        max_tokens: Math.max(300, wordCountTarget * 2),
+        temperature: 0.9,
+        max_tokens: Math.max(400, wordCountTarget * 3),
       }),
     });
 
@@ -152,13 +292,13 @@ export async function createDailyArticle(
 
 function getWordCountTarget(hskLevel: HskLevel): number {
   switch (hskLevel) {
-    case 1: return 80;
-    case 2: return 120;
-    case 3: return 180;
-    case 4: return 250;
-    case 5: return 350;
-    case 6: return 450;
-    default: return 120;
+    case 1: return 100;
+    case 2: return 150;
+    case 3: return 220;
+    case 4: return 300;
+    case 5: return 400;
+    case 6: return 500;
+    default: return 150;
   }
 }
 
@@ -190,67 +330,6 @@ function parseGeneratedArticle(
     } else {
       title = '今日故事';
     }
-  }
-
-  return {
-    id: `article_${Date.now()}`,
-    title,
-    content: `${title}\n\n${content}`,
-    words: newWords,
-    hskLevel,
-    interestTags,
-    generatedAt: Date.now(),
-    wordCount: content.length / 2,
-    characterCount: content.length,
-  };
-}
-
-function generateFallbackArticle(
-  hskLevel: HskLevel,
-  interestTags: string[],
-  newWords: ChineseWord[],
-  weakChars: string[],
-): Article {
-  const tag = interestTags[0]?.toLowerCase() || 'general';
-  const template = INTEREST_ARTICLE_TEMPLATES[tag] || INTEREST_ARTICLE_TEMPLATES['minecraft'];
-  const title = randomPick(template.titles);
-
-  let content = randomPick(template.templates)
-    .replace(/{player}/g, randomPick(NAMES))
-    .replace(/{place}/g, randomPick(PLACES))
-    .replace(/{animal}/g, randomPick(ANIMALS))
-    .replace(/{action}/g, randomPick(ACTIONS))
-    .replace(/{name}/g, randomPick(NAMES))
-    .replace(/{other}/g, randomPick(OTHERS))
-    .replace(/{food}/g, randomPick(FOODS))
-    .replace(/{bodyPart}/g, randomPick(BODY_PARTS))
-    .replace(/{result}/g, Math.random() > 0.5 ? '进了' : '没进')
-    .replace(/{coach}/g, '教练')
-    .replace(/{number}/g, Math.floor(Math.random() * 10 + 2).toString());
-
-  // Insert new words NATURALLY into the story, not as a list
-  if (newWords.length > 0) {
-    const player = randomPick(NAMES);
-    const newWordList = newWords.map(w => w.word);
-    // Distribute words across natural sentences, don't concatenate
-    for (const w of newWordList) {
-      if (ACTIONS.includes(w)) {
-        content += `，${player}高兴地${w}了`;
-      } else if (FOODS.includes(w)) {
-        content += `，${player}吃了美味的${w}`;
-      } else if (PLACES.includes(w)) {
-        content += `，${player}去了${w}`;
-      } else {
-        content += `，${player}学会了"${w}"这个字`;
-      }
-    }
-    content += '。';
-  }
-
-  // Insert weak chars naturally
-  if (weakChars.length > 0) {
-    const weakStr = weakChars.slice(0, 3).join('');
-    content += ` ${randomPick(NAMES)}开心地说："我认识${weakStr}这些字了！"`;
   }
 
   return {

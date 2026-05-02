@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { listenToAuthChanges, waitForAuth, getClientProfile, createDefaultProfile, setClientProfile, updateClientProfile } from '@/lib/auth';
 import { getTodayTask, SrsTask } from '@/lib/srs';
 import { speakText, stopSpeaking, warmUpVoices, setWordBoundaries } from '@/lib/tts';
-import { getWord, getWordsByLevel } from '@/lib/hsk';
+import { getWord, getWordsByLevel, getAllWords } from '@/lib/hsk';
 import { initLexicon } from '@/lib/lexicon';
 import { ChineseWord } from '@/lib/types';
 
@@ -17,25 +17,39 @@ export default function DailyPage() {
   const [selectedWord, setSelectedWord] = useState<ChineseWord | null>(null);
   const [readingComplete, setReadingComplete] = useState(false);
   const [isReading, setIsReading] = useState(false);
-  const [activeChar, setActiveChar] = useState<string | null>(null);
-  const [activeCharIndex, setActiveCharIndex] = useState<number>(-1);
+  const [activeWord, setActiveWord] = useState<string | null>(null);
+  const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [navCountdown, setNavCountdown] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
-  const charRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const profileRef = useRef(getClientProfile());
 
-  // Build char-level boundaries from article content for TTS sync
-  const buildCharBoundaries = useCallback((text: string) => {
-    const boundaries: { char: string; start: number; end: number }[] = [];
-    // Group consecutive Chinese chars as words
+  // Build word-level boundaries from article content for TTS sync
+  // Uses known HSK words to group characters into words
+  const buildWordBoundaries = useCallback((text: string) => {
+    const knownWords = new Set(
+      getAllWords().map(w => w.word)
+    );
+    const boundaries: { word: string; start: number; end: number }[] = [];
     let i = 0;
     while (i < text.length) {
-      const ch = text[i];
-      if (/[\u4e00-\u9fff]/.test(ch)) {
-        boundaries.push({ char: ch, start: i, end: i + 1 });
+      // Try to match multi-char word first (max 4 chars)
+      let matched = false;
+      for (let len = 4; len >= 1; len--) {
+        if (i + len <= text.length) {
+          const slice = text.slice(i, i + len);
+          if (knownWords.has(slice) || (len === 1 && /[\u4e00-\u9fff]/.test(slice))) {
+            boundaries.push({ word: slice, start: i, end: i + len });
+            i += len;
+            matched = true;
+            break;
+          }
+        }
       }
-      i++;
+      if (!matched) {
+        i++;
+      }
     }
     return boundaries;
   }, []);
@@ -76,24 +90,24 @@ export default function DailyPage() {
       // Pre-warm TTS voices
       warmUpVoices();
 
-      // Build character boundaries for this article
+      // Build word boundaries for this article
       if (todayTask) {
-        const boundaries = buildCharBoundaries(todayTask.article.content);
-        setWordBoundaries(boundaries);
+        const wb = buildWordBoundaries(todayTask.article.content);
+        setWordBoundaries(wb.map(b => ({ char: b.word, start: b.start, end: b.end })));
       }
 
       setInitialized(true);
     };
     init();
-  }, [router, buildCharBoundaries]);
+  }, [router, buildWordBoundaries]);
 
-  // Auto-scroll to active char during reading
+  // Auto-scroll to active word during reading
   useEffect(() => {
-    if (activeCharIndex >= 0 && charRefs.current[activeCharIndex]) {
-      const el = charRefs.current[activeCharIndex];
+    if (activeWordIndex >= 0 && wordRefs.current[activeWordIndex]) {
+      const el = wordRefs.current[activeWordIndex];
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [activeCharIndex]);
+  }, [activeWordIndex]);
 
   // Countdown timer for navigation after complete
   useEffect(() => {
@@ -120,40 +134,35 @@ export default function DailyPage() {
     if (isReading) {
       stopSpeaking();
       setIsReading(false);
-      setActiveChar(null);
-      setActiveCharIndex(-1);
+      setActiveWord(null);
+      setActiveWordIndex(-1);
       return;
     }
 
     setIsReading(true);
 
-    // Build flat char indices for the full content
+    // Build flat word indices for the full content
     const text = task.article.content;
-    const charIndices: number[] = [];
-    for (let i = 0; i < text.length; i++) {
-      if (/[\u4e00-\u9fff]/.test(text[i])) {
-        charIndices.push(i);
-      }
-    }
+    const wb = buildWordBoundaries(text);
 
-    let currentIdx = 0;
     speakText(text, {
       lang: 'zh-CN',
       rate: 0.8,
       pitch: 1.1,
-      onBoundary: (char, idx) => {
-        setActiveChar(char);
-        // Find the nearest char index
-        const nearest = charIndices.findIndex(ci => ci >= idx);
-        if (nearest >= 0) {
-          setActiveCharIndex(nearest);
-          currentIdx = nearest;
+      onBoundary: (_char, idx) => {
+        // Find which word this character position falls into
+        for (let i = 0; i < wb.length; i++) {
+          if (idx >= wb[i].start && idx < wb[i].end) {
+            setActiveWord(wb[i].word);
+            setActiveWordIndex(i);
+            return;
+          }
         }
       },
       onEnd: () => {
         setIsReading(false);
-        setActiveChar(null);
-        setActiveCharIndex(-1);
+        setActiveWord(null);
+        setActiveWordIndex(-1);
       },
     });
   };
@@ -169,8 +178,8 @@ export default function DailyPage() {
   const handleComplete = () => {
     stopSpeaking();
     setIsReading(false);
-    setActiveChar(null);
-    setActiveCharIndex(-1);
+    setActiveWord(null);
+    setActiveWordIndex(-1);
     setReadingComplete(true);
 
     const profile = profileRef.current;
@@ -225,9 +234,9 @@ export default function DailyPage() {
     );
   }
 
-  // Build article content with highlighted chars
+    // Build article content with highlighted words
   const contentLines = task.article.content.split('\n').filter(Boolean);
-  let globalCharIndex = 0;
+  let globalWordIndex = 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 flex flex-col">
@@ -267,49 +276,81 @@ export default function DailyPage() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">
               {task.article.title}
             </h2>
-
             <div className="space-y-3 leading-relaxed text-lg">
+
               {contentLines.map((line, lineIdx) => (
                 <p key={lineIdx} className="text-gray-700">
-                  {line.split('').map((char, j) => {
-                    const isChinese = /[\u4e00-\u9fff]/.test(char);
-                    let thisCharIndex = -1;
-                    if (isChinese) {
-                      thisCharIndex = globalCharIndex++;
+                  {(() => {
+                    // Pre-compute word boundaries for this line
+                    const lineBoundaries: { word: string; start: number }[] = [];
+                    let i = 0;
+                    const allKnown = new Set(getAllWords().map(w => w.word));
+                    while (i < line.length) {
+                      let matched = false;
+                      for (let len = 4; len >= 1; len--) {
+                        if (i + len <= line.length) {
+                          const slice = line.slice(i, i + len);
+                          if (allKnown.has(slice) || (len === 1 && /[\u4e00-\u9fff]/.test(slice))) {
+                            lineBoundaries.push({ word: slice, start: i });
+                            i += len;
+                            matched = true;
+                            break;
+                          }
+                        }
+                      }
+                      if (!matched) i++;
                     }
 
-                    const isActive = thisCharIndex === activeCharIndex;
-                    const word = isChinese ? getWord(char) : undefined;
-                    const pinyin = word?.pinyin || '';
+                    // Render char by char with word-level grouping for highlighting
+                    const elements: React.ReactNode[] = [];
+                    let activeWordContent = '';
+                    let inActiveWord = false;
 
-                    if (!isChinese) {
-                      return <span key={j}>{char}</span>;
-                    }
+                    for (let j = 0; j < line.length; j++) {
+                      const char = line[j];
+                      const isChinese = /[\u4e00-\u9fff]/.test(char);
+                      const wordInfo = isChinese ? getWord(char) : undefined;
+                      const pinyin = wordInfo?.pinyin || '';
 
-                    return (
-                      <span
-                        key={j}
-                        ref={el => { if (thisCharIndex >= 0) charRefs.current[thisCharIndex] = el; }}
-                        onClick={() => handleWordClick(char)}
-                        className={`
-                          inline-block cursor-pointer transition-all duration-150 rounded px-0.5 relative group
-                          ${word ? 'hover:bg-amber-100 hover:scale-110' : ''}
-                          ${isActive ? 'bg-amber-400 text-white scale-110 shadow-md rounded-md px-1 -mx-0.5' : ''}
-                          ${selectedWord?.word === char ? 'text-amber-600 bg-amber-100 rounded' : ''}
-                        `}
-                        title={pinyin}
-                      >
-                        {showPinyin && pinyin && (
-                          <span className={`block text-[10px] leading-none text-center transition-colors duration-150 ${isActive ? 'text-white' : 'text-amber-500'}`}>
-                            {pinyin}
+                      // Check if this char is the start of an active word
+                      let isActive = false;
+                      for (const lwb of lineBoundaries) {
+                        if (j === lwb.start && lwb.word === activeWord) {
+                          isActive = true;
+                          break;
+                        }
+                      }
+
+                      if (!isChinese) {
+                        elements.push(<span key={j}>{char}</span>);
+                      } else {
+                        elements.push(
+                          <span
+                            key={j}
+                            onClick={() => handleWordClick(char)}
+                            className={`inline-block cursor-pointer transition-all duration-150 rounded px-0.5 relative group ${
+                              wordInfo ? 'hover:bg-amber-100 hover:scale-110' : ''
+                            } ${
+                              isActive ? 'bg-amber-400 text-white scale-110 shadow-md rounded-md px-1 -mx-0.5' : ''
+                            } ${
+                              selectedWord?.word === char ? 'text-amber-600 bg-amber-100 rounded' : ''
+                            }`}
+                            title={pinyin}
+                          >
+                            {showPinyin && pinyin && (
+                              <span className={`block text-[10px] leading-none text-center transition-colors duration-150 ${isActive ? 'text-white' : 'text-amber-500'}`}>
+                                {pinyin}
+                              </span>
+                            )}
+                            <span className={`transition-colors duration-150 ${wordInfo ? 'font-medium' : ''} ${isActive ? 'text-white' : ''}`}>
+                              {char}
+                            </span>
                           </span>
-                        )}
-                        <span className={`transition-colors duration-150 ${word ? 'font-medium' : ''} ${isActive ? 'text-white' : ''}`}>
-                          {char}
-                        </span>
-                      </span>
-                    );
-                  })}
+                        );
+                      }
+                    }
+                    return elements;
+                  })()}
                 </p>
               ))}
             </div>
