@@ -116,10 +116,10 @@ function injectWords(text: string, newWords: ChineseWord[], ctx: StoryContext): 
   for (const w of foodWords) {
     result += ` ${ctx.player}吃了美味的${w.word}，真好吃。`;
   }
-
-  // Insert other words naturally
-  for (const w of otherWords) {
-    result += ` ${ctx.player}学会了"${w.word}"这个词语。`;
+  // Insert other words naturally into the story - single natural sentence
+  if (otherWords.length > 0) {
+    const wordList = otherWords.map(w => w.word).join("、");
+    result += " " + ctx.player + "认真记住了" + wordList + "这些新词语。";
   }
 
   return result;
