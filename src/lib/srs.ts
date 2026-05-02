@@ -1,9 +1,13 @@
-import { LexiconEntry, HskLevel, Article, ChineseWord } from './types';
-import { getReviewWords, getOrCreateEntry } from './lexicon';
-import { getWordsByLevel } from './hsk';
+import { LexiconEntry, HskLevel, Article, ChineseWord, QcFeedback } from './types';
+import { getReviewWords, getOrCreateEntry, getPendingWords,
+         getOrCreateCharEntry, getQcAdaptation, getWeakChars,
+         updatePendingWords, setQcFeedback } from './lexicon';
+import { getWordsByLevel, extractChars, getCharsByLevel } from './hsk';
+import { createDailyArticle } from './deepseek';
 
-// SRS (Spaced Repetition System) Engine
+// SRS (Spaced Repetition) Engine
 // Manages when words should be reviewed based on mastery level
+// Enhanced with: char/word dual tracking, pendingWords, interval decay, QC feedback loop
 
 export interface SrsTask {
   newWords: ChineseWord[];
@@ -57,6 +61,7 @@ function generateArticleContent(
   interestTags: string[],
   hskLevel: HskLevel,
   newWords: ChineseWord[],
+  weakChars: string[],
 ): Article {
   const tag = interestTags[0]?.toLowerCase() || 'general';
   const template = INTEREST_ARTICLE_TEMPLATES[tag] || INTEREST_ARTICLE_TEMPLATES['minecraft'];
@@ -87,23 +92,33 @@ function generateArticleContent(
     content += ' ' + newWords.map(w => w.word).join('、') + '真好看！';
   }
 
+  // Insert weak characters into the article for repeated exposure
+  const weakCharSection = weakChars.length > 0
+    ? ' ' + weakChars.slice(0, 5).join('、') + '这些字要记住哦！'
+    : '';
+
   return {
     id: `article_${Date.now()}`,
     title,
-    content: `${title}\n\n${content}`,
+    content: `${title}\n\n${content}${weakCharSection}`,
     words: [...newWords],
     hskLevel,
     interestTags,
     generatedAt: Date.now(),
     wordCount: content.length / 2,
-    // characterCount: content.length,
+    characterCount: content.length,
   };
 }
 
-export function getTodayTask(
+export async function getTodayTask(
   profile: { hskLevel: HskLevel; interests: string[] },
   customWords?: ChineseWord[],
-): SrsTask {
+): Promise<SrsTask> {
+  // --- QC feedback loop: get adaptation params ---
+  const adaptation = getQcAdaptation();
+  const weakChars = getWeakChars();
+
+  // Get review words based on SRS
   const reviewWords = getReviewWords(3);
 
   // Get new words to learn based on level
@@ -111,21 +126,102 @@ export function getTodayTask(
   const availableNew = levelWords.filter(
     lw => !reviewWords.find(rw => rw.word === lw.word)
   );
+
+  // Adjust new word count based on QC feedback
+  const maxNewWords = Math.max(1, Math.round(5 * adaptation.newWordDensity));
   const newWords = customWords || availableNew
     .sort(() => Math.random() - 0.5)
-    .slice(0, 5);
+    .slice(0, maxNewWords);
 
-  const article = generateArticleContent(
-    profile.interests,
+  // --- Char tracking: ensure all chars from new/review words are tracked ---
+  const allWordStrings = [
+    ...newWords.map(w => w.word),
+    ...reviewWords.map(rw => rw.word),
+  ];
+  const allChars = extractChars(allWordStrings);
+  for (const ch of allChars) {
+    getOrCreateCharEntry(ch);
+  }
+
+  // --- PendingWords: automatically activate words whose chars are mastered ---
+  updatePendingWords();
+  const pendingWords = getPendingWords();
+
+  // Boost pending words into consideration
+  const pendingBoosted = pendingWords.slice(0, 3);
+  const pendingWordObjects: ChineseWord[] = pendingBoosted.map(pw => ({
+    word: pw.word,
+    pinyin: '',
+    meaning: '',
+    hskLevel: pw.hskLevel,
+  }));
+
+  // Merge pending words into newWords (don't exceed count too much)
+  const combinedNew = [...newWords];
+  for (const pw of pendingWordObjects) {
+    if (!combinedNew.find(nw => nw.word === pw.word)) {
+      combinedNew.push(pw);
+    }
+  }
+
+  const article = await createDailyArticle(
     profile.hskLevel,
-    newWords,
+    profile.interests,
+    combinedNew,
+    weakChars,
   );
 
+  // Attach weak chars to article for QC to use
+  (article as any).weakChars = weakChars;
+
   return {
-    newWords,
+    newWords: combinedNew,
     reviewWords,
     article,
   };
+}
+
+/**
+ * Process QC feedback after a quiz session.
+ * This feeds quality metrics back into SRS for adaptive generation.
+ */
+export function processQcFeedback(feedback: {
+  wordResults: { word: string; correct: boolean }[];
+  charResults: { char: string; correct: boolean }[];
+}): void {
+  const weakWords: string[] = [];
+  const weakChars: string[] = [];
+  let correctCount = 0;
+  let totalCount = 0;
+
+  for (const r of feedback.wordResults) {
+    totalCount++;
+    if (r.correct) {
+      correctCount++;
+    } else {
+      weakWords.push(r.word);
+    }
+  }
+
+  for (const r of feedback.charResults) {
+    totalCount++;
+    if (r.correct) {
+      correctCount++;
+    } else {
+      weakChars.push(r.char);
+    }
+  }
+
+  const accuracy = totalCount > 0 ? correctCount / totalCount : 1;
+  const qualityIssue = accuracy < 0.7;
+
+  setQcFeedback({ weakWords, weakChars, accuracy });
+
+  // Log adaptation for debugging
+  if (qualityIssue) {
+    const adaptation = getQcAdaptation();
+    console.log(`[SRS QC] Accuracy ${accuracy.toFixed(2)}, adjusting: newWordDensity=${adaptation.newWordDensity.toFixed(2)}, weakCharBoost=${adaptation.weakCharBoost}`);
+  }
 }
 
 // For compatibility with existing code that might import `getTodayLearningTask`

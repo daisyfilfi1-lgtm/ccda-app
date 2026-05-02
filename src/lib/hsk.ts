@@ -152,3 +152,40 @@ export function getMeaning(word: string): string {
   const entry = getWord(word);
   return entry?.meaning || '';
 }
+
+// Char extraction utilities for SRS engine
+export function extractChars(words: string[]): string[] {
+  const charSet = new Set<string>();
+  for (const word of words) {
+    for (const char of word) {
+      if (/[\u4e00-\u9fff]/.test(char)) {
+        charSet.add(char);
+      }
+    }
+  }
+  return Array.from(charSet);
+}
+
+export function getCharsByLevel(_level: number): string[] {
+  // Simplified: return placeholder char list
+  return ['我','你','他','她','的','了','是','不','人','大','小'];
+}
+
+export function getCharToWordIndex(): Map<string, string[]> {
+  const idx = new Map<string, string[]>();
+  const levels = [1, 2, 3] as const;
+  for (const level of levels) {
+    const words = HSK_WORDS[level as HskLevel];
+    if (!words) continue;
+    for (const w of words) {
+      for (const ch of w.word) {
+        if (/[\u4e00-\u9fff]/.test(ch)) {
+          if (!idx.has(ch)) idx.set(ch, []);
+          const arr = idx.get(ch)!;
+          if (!arr.includes(w.word)) arr.push(w.word);
+        }
+      }
+    }
+  }
+  return idx;
+}

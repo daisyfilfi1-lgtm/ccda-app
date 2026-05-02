@@ -2,32 +2,37 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getClientAuth, getClientProfile } from '@/lib/auth';
+import { listenToAuthChanges, waitForAuth, getClientProfile } from '@/lib/auth';
 
 export default function HomePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const auth = getClientAuth();
-    const profile = getClientProfile();
-    
-    if (!auth) {
-      router.replace('/login');
-      return;
-    }
-    
-    if (!profile || profile.interests.length === 0) {
-      router.replace('/assessment');
-      return;
-    }
-    
-    if (profile.totalRead === 0) {
+    const init = async () => {
+      const cleanup = listenToAuthChanges();
+      const auth = await waitForAuth();
+      const profile = getClientProfile();
+
+      if (!auth) {
+        router.replace('/login');
+        return;
+      }
+
+      if (!profile || profile.interests.length === 0) {
+        router.replace('/assessment');
+        return;
+      }
+
+      if (profile.totalRead === 0) {
+        router.replace('/daily');
+        return;
+      }
+
       router.replace('/daily');
-      return;
-    }
-    
-    router.replace('/daily');
+      return () => cleanup();
+    };
+    init();
   }, [router]);
 
   return (

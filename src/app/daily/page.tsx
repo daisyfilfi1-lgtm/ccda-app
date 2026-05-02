@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getClientAuth, getClientProfile, updateClientProfile, createDefaultProfile } from '@/lib/auth';
+import { listenToAuthChanges, waitForAuth, getClientProfile, updateClientProfile, createDefaultProfile } from '@/lib/auth';
 import { getTodayTask, SrsTask } from '@/lib/srs';
 import { annotatePinyin, getTextPinyin } from '@/lib/pinyin';
 import { speakText, stopSpeaking } from '@/lib/tts';
@@ -24,7 +24,9 @@ export default function DailyPage() {
   const profileRef = useRef(getClientProfile());
 
   useEffect(() => {
-    const auth = getClientAuth();
+    const init = async () => {
+    const cleanup = listenToAuthChanges();
+    const auth = await waitForAuth();
     if (!auth) {
       router.replace('/login');
       return;
@@ -33,7 +35,6 @@ export default function DailyPage() {
     let profile = getClientProfile();
     if (!profile) {
       profile = createDefaultProfile(auth);
-      // Use setClientProfile from auth
       const { setClientProfile } = require('@/lib/auth');
       setClientProfile(profile);
     }
@@ -53,13 +54,15 @@ export default function DailyPage() {
       }))
     );
 
-    const todayTask = getTodayTask(profile);
+    const todayTask = await getTodayTask(profile);
     setTask(todayTask);
 
     // Check if pinyin should be shown by default
     setShowPinyin(profile.hskLevel <= 2);
 
     setInitialized(true);
+    };
+    init();
   }, [router]);
 
   // Track scroll progress
@@ -81,7 +84,7 @@ export default function DailyPage() {
       return;
     }
     setIsReading(true);
-    speakText(task.article.body || "", {
+    speakText(task.article.content, {
       lang: 'zh-CN',
       rate: 0.85,
       onEnd: () => setIsReading(false),
@@ -200,7 +203,7 @@ export default function DailyPage() {
 
             {/* Content with clickable words */}
             <div className="space-y-3 leading-relaxed text-lg">
-              {(task.article.body || "").split('\n').filter(Boolean).map((line, i) => (
+              {task.article.content.split('\n').filter(Boolean).map((line, i) => (
                 <p key={i} className="text-gray-700">
                   {line.split('').map((char, j) => {
                     const isChinese = /[\u4e00-\u9fff]/.test(char);

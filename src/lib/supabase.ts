@@ -1,24 +1,31 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient, createServerClient } from '@supabase/ssr'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
-export function createClient(cookieHeader?: string) {
-  if (cookieHeader) {
-    // Server-side / middleware: pass the request cookies
-    return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-      global: {
-        headers: {
-          cookie: cookieHeader,
+export function createServerSideClient(cookieStr?: string) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          if (!cookieStr) return undefined
+          for (const c of cookieStr.split('; ')) {
+            const eq = c.indexOf('=')
+            if (eq > 0 && c.substring(0, eq) === name) {
+              return decodeURIComponent(c.substring(eq + 1))
+            }
+          }
+          return undefined
         },
+        set() {},
+        remove() {},
       },
-    });
-  }
-  // Client-side: default browser client
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey);
+    }
+  )
 }

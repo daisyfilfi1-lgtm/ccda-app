@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase';
+import { createServerSideClient } from '@/lib/supabase';
 
-const protectedRoutes = ['/assessment', '/daily', '/interests'];
-const publicRoutes = ['/auth', '/parent', '/report'];
+const protectedRoutes = ['/assessment', '/daily', '/interests', '/quiz', '/achievement', '/onboarding'];
+const publicRoutes = ['/auth', '/login', '/parent-report'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -18,16 +18,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow public routes
-  if (publicRoutes.some((route) => pathname.startsWith(route))) {
+  // Check if route needs auth
+  const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
+  const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
+
+  if (!isProtected && !isPublic) {
     return NextResponse.next();
   }
 
-  // Check auth for protected routes
-  if (protectedRoutes.some((route) => pathname.startsWith(route))) {
-    const supabase = createClient(request.headers.get('cookie') || '');
-    const { data: { user } } = await supabase.auth.getUser();
+  // Create Supabase client with request cookies
+  const supabase = createServerSideClient(request.headers.get('cookie') || '');
 
+  // Check session
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (isProtected) {
     if (!user) {
       const url = new URL('/auth', request.url);
       url.searchParams.set('redirect', pathname);
@@ -35,6 +40,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // For public routes, no redirect needed
   return NextResponse.next();
 }
 

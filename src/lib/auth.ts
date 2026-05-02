@@ -1,9 +1,10 @@
-// Auth utility: simple cookie-based auth for MVP
-// In production, this would use Supabase Auth
+// Auth utility: real Supabase Auth integration
+// Uses Supabase session with synchronous helpers for backward compatibility
 
 import { Profile, HskLevel } from './types';
+import { createClient } from './supabase';
+import type { User } from '@supabase/supabase-js';
 
-const AUTH_COOKIE = 'ccda_auth';
 const PROFILE_KEY = 'ccda_profile';
 
 export interface AuthUser {
@@ -12,30 +13,89 @@ export interface AuthUser {
   id: string;
 }
 
-// Client-side helpers
+// Module-level cached auth state (populated by listenToAuthChanges)
+let cachedUser: AuthUser | null = null;
+let authInitialized = false;
+
+// Queue of callbacks waiting for auth to be ready
+const authReadyCallbacks: Array<(user: AuthUser | null) => void> = [];
+
+function notifyAuthReady(user: AuthUser | null): void {
+  cachedUser = user;
+  authInitialized = true;
+  for (const cb of authReadyCallbacks) {
+    cb(user);
+  }
+  authReadyCallbacks.length = 0;
+}
+
+/**
+ * Initialize auth state listener. Call once at app startup.
+ * Stores session info in module-level cache for sync access.
+ */
+export function listenToAuthChanges(): () => void {
+  const supabase = createClient();
+
+  // Check existing session
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session?.user) {
+      notifyAuthReady(mapSupabaseUser(session.user));
+    } else {
+      notifyAuthReady(null);
+    }
+  });
+
+  // Listen for future changes
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user) {
+      notifyAuthReady(mapSupabaseUser(session.user));
+    } else {
+      notifyAuthReady(null);
+    }
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}
+
+function mapSupabaseUser(user: User): AuthUser {
+  return {
+    id: user.id,
+    email: user.email || '',
+    name: user.user_metadata?.name || user.email?.split('@')[0] || '用户',
+  };
+}
+
+/**
+ * Wait for auth to be initialized (for use in useEffect before sync calls).
+ * Resolves immediately if already initialized.
+ */
+export function waitForAuth(): Promise<AuthUser | null> {
+  if (authInitialized) {
+    return Promise.resolve(cachedUser);
+  }
+  return new Promise((resolve) => {
+    authReadyCallbacks.push(resolve);
+  });
+}
+
+// Synchronous helpers (reads from module-level cache)
 export function getClientAuth(): AuthUser | null {
   if (typeof window === 'undefined') return null;
-  try {
-    const raw = document.cookie
-      .split('; ')
-      .find(row => row.startsWith(AUTH_COOKIE))
-      ?.split('=')[1];
-    if (!raw) return null;
-    return JSON.parse(decodeURIComponent(raw));
-  } catch {
-    return null;
-  }
+  return cachedUser;
 }
 
 export function setClientAuth(user: AuthUser): void {
-  document.cookie = `${AUTH_COOKIE}=${encodeURIComponent(JSON.stringify(user))};path=/;max-age=${60 * 60 * 24 * 30}`;
+  cachedUser = user;
+  authInitialized = true;
 }
 
 export function clearClientAuth(): void {
-  document.cookie = `${AUTH_COOKIE}=;path=/;max-age=0`;
+  cachedUser = null;
 }
 
-// Profile helpers
+// Profile helpers (kept as localStorage for now - profile sync via Supabase DB is future work)
 export function getClientProfile(): Profile | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -61,16 +121,9 @@ export function updateClientProfile(updates: Partial<Profile>): Profile | null {
 // Server-side helpers for API routes
 export function parseAuthCookie(cookieHeader: string | null): AuthUser | null {
   if (!cookieHeader) return null;
-  try {
-    const raw = cookieHeader
-      .split('; ')
-      .find(row => row.startsWith(AUTH_COOKIE))
-      ?.split('=')[1];
-    if (!raw) return null;
-    return JSON.parse(decodeURIComponent(raw));
-  } catch {
-    return null;
-  }
+  // For middleware/API routes, use Supabase server client
+  // This is handled by the middleware directly
+  return null;
 }
 
 // Default profile factory

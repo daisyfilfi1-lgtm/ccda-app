@@ -6,7 +6,7 @@ import { getClientAuth, getClientProfile, updateClientProfile } from '@/lib/auth
 import { getTodayTask } from '@/lib/srs';
 import { generateQuiz, checkAnswer } from '@/lib/qc';
 import { updateMasteryAfterQuiz } from '@/lib/lexicon';
-import { QuizQuestion } from '@/lib/types/index';
+import { QuizQuestion } from '@/lib/types';
 
 export default function QuizPage() {
   const router = useRouter();
@@ -22,28 +22,31 @@ export default function QuizPage() {
   const profileRef = useRef(getClientProfile());
 
   useEffect(() => {
-    const auth = getClientAuth();
-    if (!auth) {
-      router.replace('/login');
-      return;
-    }
+    const init = async () => {
+      const auth = getClientAuth();
+      if (!auth) {
+        router.replace('/login');
+        return;
+      }
 
-    const profile = getClientProfile();
-    if (!profile) {
-      router.replace('/assessment');
-      return;
-    }
-    profileRef.current = profile;
+      const profile = getClientProfile();
+      if (!profile) {
+        router.replace('/assessment');
+        return;
+      }
+      profileRef.current = profile;
 
-    // Get today's task and generate quiz
-    const task = getTodayTask(profile) as any;
-    const words = task?.article?.weakChars?.map((c: string) => ({ word: c, hskLevel: profile.hskLevel })) || [];
-    const quiz = generateQuiz(words, task?.article);
-    setQuestions(quiz);
-    if (quiz[1]?.options) {
-      setOrderedSentences([...quiz[1].options]);
-    }
-    setInitialized(true);
+      // Get today's task and generate quiz
+      const task = await getTodayTask(profile) as any;
+      const words = task?.article?.weakChars?.map((c: string) => ({ word: c, hskLevel: profile.hskLevel })) || [];
+      const quiz = generateQuiz(words, task?.article);
+      setQuestions(quiz);
+      if (quiz[1]?.options) {
+        setOrderedSentences([...quiz[1].options]);
+      }
+      setInitialized(true);
+    };
+    init();
   }, [router]);
 
   const handleAnswer = (answer: string | string[]) => {
