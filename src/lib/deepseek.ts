@@ -1,12 +1,12 @@
 // DeepSeek API client for AI-powered article generation
-// Uses OpenAI-compatible format, no external dependencies
+// Uses OpenAI-compatible format
 
 import { Article, ChineseWord, HskLevel } from './types';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
-// Fallback template-based article generation (same as before)
+// Rich, contextually valid story templates for fallback
 const INTEREST_ARTICLE_TEMPLATES: Record<string, {
   titles: string[];
   templates: string[];
@@ -57,7 +57,7 @@ function buildPrompt(
   wordCountTarget: number,
 ): string {
   const interestStr = interestTags.length > 0 ? interestTags.join('、') : '日常生活';
-  const newWordsStr = newWords.length > 0 ? newWords.map(w => w.word).join('、') : '（无特定生词）';
+  const newWordsStr = newWords.length > 0 ? newWords.map(w => `${w.word}（${w.pinyin}，${w.meaning}）`).join('、') : '（无特定生词）';
   const weakCharsStr = weakChars.length > 0 ? weakChars.slice(0, 10).join('、') : '（无）';
 
   return `你是一位专门为海外华人儿童创作中文阅读材料的AI助手。请根据以下要求创作一篇中文短文：
@@ -70,7 +70,7 @@ function buildPrompt(
 
 【兴趣主题】${interestStr}
 
-【生词要求】请在文章中自然地包含以下生词（加粗显示*生词*）：${newWordsStr}
+【生词要求】请在文章中自然地包含以下生词（不要列表罗列，要在句子中自然使用）：${newWordsStr}
 
 【薄弱字词】以下字词是用户薄弱项，请在文章中适当重复出现：${weakCharsStr}
 
@@ -79,13 +79,12 @@ function buildPrompt(
 【内容要求】
 1. 文章必须有趣、有故事性，符合儿童阅读习惯
 2. 使用简单自然的句子，适合目标HSK等级
-3. 生词要在上下文中自然出现，帮助理解
+3. 生词要在上下文中自然出现，帮助理解。重要：不要在一句话里罗列多个生词，要把它们分布在文章不同位置
 4. 适当重复使用HSK ${hskLevel}级的常用词汇
 5. 返回格式为：标题：[文章标题] 内容：[文章正文]`;
 }
 
 function getApiKey(): string {
-  // Try DEEPSEEK_API_KEY first, fallback to OPENAI_API_KEY
   return process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || '';
 }
 
@@ -102,9 +101,7 @@ export async function createDailyArticle(
       return generateFallbackArticle(hskLevel, interestTags, newWords, weakChars);
     }
 
-    // Calculate target word count based on HSK level
     const wordCountTarget = getWordCountTarget(hskLevel);
-
     const prompt = buildPrompt(hskLevel, interestTags, newWords, weakChars, wordCountTarget);
 
     console.log(`[DeepSeek] Generating article for HSK${hskLevel}, interests: ${interestTags.join(',')}, ${newWords.length} new words`);
@@ -120,7 +117,7 @@ export async function createDailyArticle(
         messages: [
           {
             role: 'system',
-            content: '你是CCDA中文阅读助手，专为海外华人儿童创作有趣的中文故事。你的回复必须简洁，只输出标题和正文。',
+            content: '你是CCDA中文阅读助手，专为海外华人儿童创作有趣的中文故事。你的回复必须简洁，只输出标题和正文。注意：不要把生词堆砌在一句话里，要分布在文章各处。',
           },
           {
             role: 'user',
@@ -174,20 +171,17 @@ function parseGeneratedArticle(
   let title = '';
   let content = text;
 
-  // Try to extract title
   const titleMatch = text.match(/标题[：:]\s*(.+?)(?:\n|$)/);
   if (titleMatch) {
     title = titleMatch[1].trim();
     content = text.replace(titleMatch[0], '').trim();
   }
 
-  // Try content extraction
   const contentMatch = content.match(/内容[：:]\s*([\s\S]*)/);
   if (contentMatch) {
     content = contentMatch[1].trim();
   }
 
-  // If no title found, use first line or generate one
   if (!title) {
     const firstLine = text.split('\n')[0]?.trim();
     if (firstLine && firstLine.length < 50) {
@@ -234,14 +228,29 @@ function generateFallbackArticle(
     .replace(/{coach}/g, '教练')
     .replace(/{number}/g, Math.floor(Math.random() * 10 + 2).toString());
 
-  // Insert new words
+  // Insert new words NATURALLY into the story, not as a list
   if (newWords.length > 0) {
-    content += ' ' + newWords.map(w => w.word).join('、') + '真好看！';
+    const player = randomPick(NAMES);
+    const newWordList = newWords.map(w => w.word);
+    // Distribute words across natural sentences, don't concatenate
+    for (const w of newWordList) {
+      if (ACTIONS.includes(w)) {
+        content += `，${player}高兴地${w}了`;
+      } else if (FOODS.includes(w)) {
+        content += `，${player}吃了美味的${w}`;
+      } else if (PLACES.includes(w)) {
+        content += `，${player}去了${w}`;
+      } else {
+        content += `，${player}学会了"${w}"这个字`;
+      }
+    }
+    content += '。';
   }
 
-  // Insert weak chars
+  // Insert weak chars naturally
   if (weakChars.length > 0) {
-    content += ' ' + weakChars.slice(0, 5).join('、') + '这些字要记住哦！';
+    const weakStr = weakChars.slice(0, 3).join('');
+    content += ` ${randomPick(NAMES)}开心地说："我认识${weakStr}这些字了！"`;
   }
 
   return {
