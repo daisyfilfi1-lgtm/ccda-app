@@ -280,16 +280,7 @@ export default function DailyPage() {
                               </span>
                             ))}
                           </span>
-                          {isMultiCharWord && (
-                            <span className="inline-block ml-0.5 text-[8px] bg-purple-100 text-purple-600 rounded-full px-1 leading-none align-super">
-                              词
-                            </span>
-                          )}
-                          {matchedLen === 1 && knownWordSet.has(wordSlice) && (
-                            <span className="inline-block ml-0.5 text-[8px] bg-blue-100 text-blue-600 rounded-full px-1 leading-none align-super">
-                              字
-                            </span>
-                          )}
+                          {/* 词/字标签已移除 — 不再干扰阅读体验 */}
                         </span>
                       );
                       i += matchedLen;

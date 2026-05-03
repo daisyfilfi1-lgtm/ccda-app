@@ -116,10 +116,14 @@ function injectWords(text: string, newWords: ChineseWord[], ctx: StoryContext): 
   for (const w of foodWords) {
     result += ` ${ctx.player}吃了美味的${w.word}，真好吃。`;
   }
-  // Insert other words naturally into the story - single natural sentence
+  // Insert other words - blend into story context with natural actions
   if (otherWords.length > 0) {
-    const wordList = otherWords.map(w => w.word).join("、");
-    result += " " + ctx.player + "认真记住了" + wordList + "这些新词语。";
+    const [first, ...rest] = otherWords.map(w => w.word);
+    if (rest.length > 0) {
+      result += " " + ctx.player + "看到了" + rest.join("、") + "，还有" + first + "。";
+    } else {
+      result += " " + ctx.player + "很喜欢" + first + "。";
+    }
   }
 
   return result;
@@ -166,10 +170,12 @@ export function generateFallbackArticle(
     .replace(/{twist}/g, ctx.twist)
     .replace(/{food}/g, ctx.food);
 
-  // Insert weak chars
+  // Insert weak chars naturally - no meta-text like "这些字我都认识"
   if (weakChars.length > 0) {
-    const chars = weakChars.slice(0, 3).join('、');
-    story += ` ${ctx.player}指着字说："${chars}，这些字我都认识！"`;
+    const chars = weakChars.slice(0, 3);
+    for (const ch of chars) {
+      story += ` ${ctx.player}看了看"${ch}"字，笑了起来。`;
+    }
   }
 
   const title = template.title;
@@ -217,7 +223,9 @@ function buildPrompt(
 4. 🎯 **生词融入** — 把这些生词自然地编织进故事里（不要罗列）：${newWordsStr}
 5. 🔄 **弱字重复** — 适当重复这些字：${weakCharsStr}
 6. 📏 **字数** — 约${wordCountTarget}字
-7. ⛔ **不要**在一句话里堆砌多个生词，要把它们分散在故事的不同段落
+8. ⛔ **不要**在一句话里堆砌多个生词，要把它们分散在故事的不同段落
+9. ⛔ **不要**在故事结束后加任何额外说明（如"你记住了xxx了吗"、"这些词要记住哦"等），故事讲完就结束
+10. ✅ **故事要独立完整**，看起来就像一本真正的儿童书里的一页，不能有任何教学痕迹
 
 【返回格式】
 标题：[故事标题]

@@ -87,14 +87,14 @@ function generateArticleContent(
     .slice(0, 3)
     .map(w => w.word);
 
-  // Insert a couple of new words naturally
+  // Insert a couple of new words naturally into the content
   if (newWords.length > 0) {
-    content += ' ' + newWords.map(w => w.word).join('、') + '真好看！';
+    content += ' ' + newWords.map(w => w.word).join('、') + '。';
   }
 
   // Insert weak characters into the article for repeated exposure
   const weakCharSection = weakChars.length > 0
-    ? ' ' + weakChars.slice(0, 5).join('、') + '这些字要记住哦！'
+    ? ' ' + weakChars.slice(0, 5).join('、')
     : '';
 
   return {

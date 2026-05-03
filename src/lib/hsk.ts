@@ -1,6 +1,5 @@
 import { HskLevel, ChineseWord } from './types';
 
-// HSK 1-3 vocabulary database
 const HSK_WORDS: Record<HskLevel, ChineseWord[]> = {
   1: [
     { word: '我', pinyin: 'wǒ', meaning: 'I/me', hskLevel: 1 },
@@ -118,7 +117,7 @@ const HSK_WORDS: Record<HskLevel, ChineseWord[]> = {
     { word: '选择', pinyin: 'xuǎnzé', meaning: 'choose', hskLevel: 3 },
     { word: '准备', pinyin: 'zhǔnbèi', meaning: 'prepare', hskLevel: 3 },
   ],
-  4: [], 5: [], 6: []
+  4: [], 5: [], 6: [], 7: [], 8: [], 9: []
 };
 
 export function getWordsByLevel(level: HskLevel): ChineseWord[] {
