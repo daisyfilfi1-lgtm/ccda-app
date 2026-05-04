@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { listenToAuthChanges, waitForAuth, getClientProfile, createDefaultProfile, setClientProfile, updateClientProfile } from '@/lib/auth';
+import { getClientProfile, createDefaultProfile, setClientProfile, updateClientProfile } from '@/lib/auth';
 import { getTodayTask, SrsTask } from '@/lib/srs';
 import { speakText, stopSpeaking, warmUpVoices } from '@/lib/tts';
 import { getWord, getWordsByLevel, getAllWords } from '@/lib/hsk';
@@ -193,7 +193,13 @@ export default function DailyPage() {
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-amber-100 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="flex-1" />
+          <button
+            onClick={() => router.push('/profile')}
+            className="text-xl hover:scale-110 transition-transform"
+            title="个人主页"
+          >
+            👤
+          </button>
           <div className="text-center">
             <h1 className="text-lg font-bold text-gray-800">📖 今日阅读</h1>
             <p className="text-xs text-gray-400">

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getClientAuth } from '@/lib/auth';
 
-export function useAuthGuard() {
+export function useAuthGuard(): boolean {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
 

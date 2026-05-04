@@ -164,12 +164,19 @@ export default function AchievementPage() {
             </div>
 
             {/* Navigation buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => router.push('/daily')}
                 className="flex-1 bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold py-3 rounded-xl text-sm hover:from-amber-500 hover:to-orange-500 transition-all shadow-md"
               >
                 📖 继续阅读
+              </button>
+              <button
+                onClick={() => router.push('/profile')}
+                className="bg-white border-2 border-amber-200 text-amber-700 font-bold py-3 rounded-xl text-sm hover:bg-amber-50 transition-all px-4"
+                title="个人主页"
+              >
+                👤
               </button>
               <button
                 onClick={() => router.push('/parent-report')}
@@ -178,7 +185,6 @@ export default function AchievementPage() {
                 📊 学习报告
               </button>
             </div>
-          </div>
         </div>
       </div>
     </AppLayout>

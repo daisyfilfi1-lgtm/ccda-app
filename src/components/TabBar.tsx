@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 
 const tabs = [
   { path: '/daily', label: '今日阅读', icon: '📖' },
+  { path: '/quiz', label: '测验', icon: '✏️' },
   { path: '/achievement', label: '成就', icon: '🏆' },
   { path: '/parent-report', label: '学习报告', icon: '📊' },
 ];
@@ -25,7 +26,7 @@ export default function TabBar() {
             <button
               key={tab.path}
               onClick={() => router.push(tab.path)}
-              className={`flex-1 flex flex-col items-center py-2.5 transition-all ${
+              className={`flex-1 flex flex-col items-center py-2.5 transition-all relative ${
                 isActive
                   ? 'text-amber-600 scale-105'
                   : 'text-gray-400 hover:text-amber-500'

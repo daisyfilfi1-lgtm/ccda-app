@@ -7,8 +7,9 @@ import { usePageTitle } from '@/components/usePageTitle';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  usePageTitle('欢迎');
   const authorized = useAuthGuard();
+  usePageTitle('欢迎');
+
   if (!authorized) return null;
 
   const handleStart = () => {

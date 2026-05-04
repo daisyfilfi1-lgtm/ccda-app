@@ -229,13 +229,28 @@ const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '�
           </div>
         </div>
 
-        {/* Back button */}
-        <button
-          onClick={() => router.push('/achievement')}
-          className="w-full bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold py-3 rounded-2xl hover:from-amber-500 hover:to-orange-500 transition-all shadow-md"
-        >
-          ← 返回
-        </button>
+        {/* Navigation */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => router.push('/achievement')}
+            className="flex-1 bg-white border-2 border-amber-200 text-amber-700 font-bold py-3 rounded-2xl hover:bg-amber-50 transition-all"
+          >
+            ← 成就
+          </button>
+          <button
+            onClick={() => router.push('/profile')}
+            className="bg-white border-2 border-amber-200 text-amber-700 font-bold py-3 rounded-2xl hover:bg-amber-50 transition-all px-4"
+            title="个人主页"
+          >
+            👤
+          </button>
+          <button
+            onClick={() => router.push('/daily')}
+            className="flex-1 bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold py-3 rounded-2xl hover:from-amber-500 hover:to-orange-500 transition-all shadow-md"
+          >
+            📖 阅读
+          </button>
+        </div>
       </div>
     </AppLayout>
   );

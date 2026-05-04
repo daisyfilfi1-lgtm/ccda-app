@@ -88,6 +88,16 @@ const ALL_OBJECTS = ['一朵花', '一个盒子', '一颗星星', '一个气球'
 const ALL_ACTIONS = ['跑步', '跳绳', '踢球', '画画', '唱歌', '跳舞', '骑车', '游泳'];
 const ALL_EVENTS = ['跑步', '跳高', '画画', '唱歌'];
 const ALL_FOODS = ['苹果', '蛋糕', '面包', '饼干', '冰淇淋', '牛奶', '水果', '面条'];
+// Sub-categories for natural verbs
+const ALL_DRINKS = ['水', '牛奶', '果汁', '茶', '可乐', '咖啡', '奶'];
+const ALL_SOLID_FOODS = ['苹果', '蛋糕', '面包', '饼干', '冰淇淋', '水果', '面条', '鸡蛋', '米饭', '肉', '鱼'];
+const ALL_PEOPLE_WORDS = ['妈妈', '爸爸', '哥哥', '姐姐', '弟弟', '妹妹', '老师', '朋友', '同学'];
+const ALL_COLOR_WORDS = ['红色', '蓝色', '绿色', '白色', '黑色', '黄色', '彩色', '金色'];
+const ALL_SIZE_WORDS = ['大', '小', '高', '矮', '长', '短', '胖', '瘦'];
+const ALL_FEELING_WORDS = ['开心', '难过', '高兴', '喜欢', '爱', '害怕', '生气', '快乐'];
+const ALL_NATURE_WORDS = ['太阳', '月亮', '星星', '花', '草', '树', '山', '河', '海', '云', '雨', '风'];
+const ALL_ANIMAL_SIMPLE = ['猫', '狗', '鱼', '鸟', '马', '牛', '羊', '鸡', '鸭', '龙', '兔'];
+const ALL_PLACE_SIMPLE = ['家', '学校', '医院', '商店', '公园', '图书馆', '超市', '车站'];
 
 function randomPick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -120,38 +130,141 @@ function generateStoryContext(hskLevel: HskLevel = 3): StoryContext {
   };
 }
 
+function getSentenceForWord(word: string, ctx: StoryContext): string {
+  const p = ctx.player;
+  const f = ctx.friend;
+
+  // 1. Drinks — use 喝
+  if (ALL_DRINKS.includes(word)) {
+    const perks = ['', '冰镇的', '热热的', '甜甜的'];
+    return ` ${p}喝了一口${randomPick(perks)}${word}，觉得真好喝。`;
+  }
+
+  // 2. Solid foods — use 吃
+  if (ALL_SOLID_FOODS.includes(word)) {
+    const perks = ['美味的', '大大的', '香喷喷的', '甜甜的'];
+    return ` ${p}吃了${randomPick(perks)}${word}，开心极了。`;
+  }
+
+  // 3. Other foods — fallback (冰淇淋 is in both, handled above)
+  if (ALL_FOODS.includes(word)) {
+    return ` ${p}尝了尝${word}，味道好极了。`;
+  }
+
+  // 4. People
+  if (ALL_PEOPLE_WORDS.includes(word)) {
+    const templates = [
+      ` ${p}和${word}一起快乐地玩了一整天。`,
+      ` ${p}最喜欢${word}了。`,
+      ` ${p}对${word}说："谢谢你！"`,
+      ` ${word}摸了摸${p}的头，${p}笑了。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 5. Colors
+  if (ALL_COLOR_WORDS.includes(word)) {
+    const things = ['小花', '气球', '蝴蝶', '衣服', '书包'];
+    return ` ${p}看到一个${word}的${randomPick(things)}，高兴得跳了起来。`;
+  }
+
+  // 6. Size words
+  if (ALL_SIZE_WORDS.includes(word)) {
+    const nouns = ['苹果', '蛋糕', '狗', '树', '房子', '球'];
+    const n = randomPick(nouns);
+    return ` 那个${n}好${word}啊！${p}惊讶地叫了起来。`;
+  }
+
+  // 7. Feelings
+  if (ALL_FEELING_WORDS.includes(word)) {
+    const templates = [
+      ` ${p}觉得非常${word}。`,
+      ` ${p}感到有点${word}。`,
+      ` ${p}的心里很${word}。`,
+      ` \"我好${word}啊！\"${p}大声说。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 8. Nature
+  if (ALL_NATURE_WORDS.includes(word)) {
+    const templates = [
+      ` 天上的${word}真漂亮！${p}抬头看着。`,
+      ` ${p}喜欢看${word}。`,
+      ` 一阵风吹来，${word}轻轻地摇动着。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 9. Simple animals
+  if (ALL_ANIMAL_SIMPLE.includes(word)) {
+    const templates = [
+      ` 一只可爱的${word}跑了过来，${p}开心地摸了摸。`,
+      ` ${p}看到了一只${word}，它对${p}叫了叫。`,
+      ` \"你好，${word}！\"${p}说。`,
+      ` ${p}最喜欢${word}了，每天都要去看它。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 10. Simple places
+  if (ALL_PLACE_SIMPLE.includes(word)) {
+    const templates = [
+      ` ${p}和${f}一起去${word}玩。那里真热闹！`,
+      ` ${p}回到了${word}，觉得像在家里一样温暖。`,
+      ` \"我们去${word}吧！\"${p}说。大家都同意了。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 11. Actions (from the original list)
+  if (ALL_ACTIONS.includes(word)) {
+    const templates = [
+      ` ${p}开心地${word}了起来。`,
+      ` ${p}和${f}一起${word}，玩得很开心。`,
+      ` 下午，${p}去${word}了。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 12. Places (from the original ALL_PLACES)
+  if (ALL_PLACES.some(p => p.includes(word)) || ALL_PLACES.includes(word)) {
+    return ` ${p}在${word}发现了一个有趣的东西。`;
+  }
+
+  // 13. Objects (from the original ALL_OBJECTS — strip 量词 prefix for matching)
+  if (ALL_OBJECTS.some(o => o.includes(word) || word.includes(o.slice(2)))) {
+    return ` ${p}拿起${word}，看了又看，爱不释手。`;
+  }
+
+  // 14. Default — word-level sensitive templates
+  // If the word is 1 character, treat as object-like
+  if (word.length === 1) {
+    const templates = [
+      ` ${p}拿起\"${word}\"字卡片，大声读了出来。`,
+      ` ${p}在地上写了一个\"${word}\"字。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // Multi-character word, unknown category — use varied natural frames
+  const templates = [
+    ` ${p}有一个${word}，非常珍惜它。`,
+    ` 说起${word}，${p}总是滔滔不绝。`,
+    ` ${p}对${word}特别感兴趣。`,
+    ` \"真不错的${word}！\"${p}感叹道。`,
+    ` ${p}学到了关于${word}的新知识。`,
+  ];
+  return randomPick(templates);
+}
+
 function injectWords(text: string, newWords: ChineseWord[], ctx: StoryContext): string {
   if (newWords.length === 0) return text;
 
-  // Categorize words by type for natural insertion
-  const actionWords = newWords.filter(w => ALL_ACTIONS.includes(w.word));
-  const foodWords = newWords.filter(w => ALL_FOODS.includes(w.word));
-  const placeWords = newWords.filter(w => ALL_PLACES.some(p => p.includes(w.word)));
-  const otherWords = newWords.filter(w =>
-    !actionWords.includes(w) && !foodWords.includes(w) && !placeWords.includes(w)
-  );
-
   let result = text;
-
-  // Insert action words
-  for (const w of actionWords) {
-    result += ` ${ctx.player}开心地${w.word}了起来。`;
+  for (const w of newWords) {
+    result += getSentenceForWord(w.word, ctx);
   }
-
-  // Insert food words
-  for (const w of foodWords) {
-    result += ` ${ctx.player}吃了美味的${w.word}，真好吃。`;
-  }
-  // Insert other words - blend into story context with natural actions
-  if (otherWords.length > 0) {
-    const [first, ...rest] = otherWords.map(w => w.word);
-    if (rest.length > 0) {
-      result += " " + ctx.player + "看到了" + rest.join("、") + "，还有" + first + "。";
-    } else {
-      result += " " + ctx.player + "很喜欢" + first + "。";
-    }
-  }
-
   return result;
 }
 
@@ -200,11 +313,17 @@ export function generateFallbackArticle(
     .replace(/{twist}/g, ctx.twist)
     .replace(/{food}/g, ctx.food);
 
-  // Insert weak chars naturally - no meta-text like "这些字我都认识"
+  // Insert weak chars naturally as part of the character's actions
   if (weakChars.length > 0) {
     const chars = weakChars.slice(0, 3);
     for (const ch of chars) {
-      story += ` ${ctx.player}看了看"${ch}"字，笑了起来。`;
+      const charTemplates = [
+        ` ${ctx.player}在纸上写了一个大大的"${ch}"字。`,
+        ` "这个字是'${ch}'。"${ctx.player}指着书说。`,
+        ` ${ctx.player}仔细看了看"${ch}"字，记住了它的样子。`,
+        ` "${ch}字真有趣！"${ctx.player}笑着说。`,
+      ];
+      story += randomPick(charTemplates);
     }
   }
 
