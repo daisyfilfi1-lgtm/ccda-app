@@ -26,16 +26,14 @@ const features = [
 export default function HomePage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
+  const [loggedIn, setLoggedIn] = useState(false);
   usePageTitle('首页');
 
   useEffect(() => {
     const init = async () => {
       const cleanup = listenToAuthChanges();
       const auth = await waitForAuth();
-      if (auth) {
-        router.replace('/daily');
-        return;
-      }
+      setLoggedIn(!!auth);
       setChecking(false);
       return () => cleanup();
     };
@@ -62,12 +60,21 @@ export default function HomePage() {
           CCDA 中文阅读
         </h1>
         <p className="text-lg text-gray-500 mb-8">每天5分钟，快乐学中文</p>
-        <button
-          onClick={() => router.push('/auth')}
-          className="bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold text-lg py-4 px-10 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all"
-        >
-          免费开始 →
-        </button>
+        {loggedIn ? (
+          <button
+            onClick={() => router.push('/daily')}
+            className="bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold text-lg py-4 px-10 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all"
+          >
+            进入应用 → 📖
+          </button>
+        ) : (
+          <button
+            onClick={() => router.push('/auth')}
+            className="bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold text-lg py-4 px-10 rounded-2xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all"
+          >
+            免费开始 →
+          </button>
+        )}
       </section>
 
       {/* Features */}
