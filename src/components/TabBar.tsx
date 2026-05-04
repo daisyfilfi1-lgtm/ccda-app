@@ -6,6 +6,7 @@ const tabs = [
   { path: '/daily', label: '今日阅读', icon: '📖' },
   { path: '/quiz', label: '测验', icon: '✏️' },
   { path: '/achievement', label: '成就', icon: '🏆' },
+  { path: '/profile', label: '我的', icon: '👤' },
   { path: '/parent-report', label: '学习报告', icon: '📊' },
 ];
 
@@ -14,7 +15,7 @@ export default function TabBar() {
   const router = useRouter();
 
   // Only show on authenticated pages
-  const showPaths = ['/daily', '/quiz', '/achievement', '/parent-report'];
+  const showPaths = ['/daily', '/quiz', '/achievement', '/profile', '/parent-report'];
   if (!showPaths.some(p => pathname.startsWith(p))) return null;
 
   return (
