@@ -109,6 +109,8 @@ const ALL_DAILY_ITEMS = ['桌子', '椅子', '门', '窗', '笔', '纸', '灯', 
 const ALL_TIME_WORDS = ['今天', '明天', '昨天', '早上', '中午', '晚上', '星期', '月', '年'];
 const ALL_ACTION_VERBS = ['看', '听', '说', '写', '读', '走', '跑', '跳', '吃', '喝', '唱', '画'];
 const ALL_BODY_PARTS = ['头', '手', '脚', '眼睛', '耳朵', '嘴巴', '鼻子', '脸'];
+const ALL_GEO_WORDS = ['中国', '北京', '上海', '国家', '城市', '地方', '世界', '地球', '南方', '北方', '东方', '西方'];
+const ALL_ABSTRACT_NOUNS = ['东西', '事情', '问题', '办法', '时候', '时间', '名字', '样子', '颜色', '方向', '礼物', '游戏'];
 
 function randomPick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -338,7 +340,29 @@ function getSentenceForWord(word: string, ctx: StoryContext): string {
     return randomPick(templates);
   }
 
-  // 21. Single character — treat as a character/shape focus
+  // 21. Geo words (国家/城市/地方等)
+  if (ALL_GEO_WORDS.includes(word)) {
+    const templates = [
+      ` ${p}最喜欢去不同的${word}旅行了。`,
+      ` ${word}真大！${p}惊讶地说。`,
+      ` ${p}在地图上找到了这个${word}，开心地指给${f}看。`,
+      ` \"我希望有一天能去这个${word}看看。\"${p}说。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 22. Abstract nouns (东西/事情/问题/游戏等)
+  if (ALL_ABSTRACT_NOUNS.includes(word)) {
+    const templates = [
+      ` ${p}认真地做完了这个${word}。`,
+      ` \"这个${word}真有趣！\"${p}笑着说。`,
+      ` ${p}想出了一个好${word}，高兴得跳了起来。`,
+      ` ${p}和${f}一起分享了这个${word}，两个人都很开心。`,
+    ];
+    return randomPick(templates);
+  }
+
+  // 23. Single character — treat as a character/shape focus
   if (word.length === 1) {
     const templates = [
       ` ${p}拿起"${word}"字卡片，大声读了出来。`,
@@ -347,7 +371,7 @@ function getSentenceForWord(word: string, ctx: StoryContext): string {
     return randomPick(templates);
   }
 
-  // 22. Default — multi-character word, unknown category
+  // 24. Default — multi-character word, unknown category
   // Use richer, more natural templates instead of the old mechanical ones
   const templates = [
     ` 说起${word}，${p}总是滔滔不绝。`,
