@@ -185,6 +185,7 @@ export default function AchievementPage() {
                 📊 学习报告
               </button>
             </div>
+          </div>
         </div>
       </div>
     </AppLayout>
