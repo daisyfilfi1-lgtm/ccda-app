@@ -6,7 +6,9 @@ import { getClientAuth, getClientProfile, updateClientProfile } from '@/lib/auth
 import { getTodayTask } from '@/lib/srs';
 import { generateQuiz, checkAnswer } from '@/lib/qc';
 import { updateMasteryAfterQuiz } from '@/lib/lexicon';
-import { QuizQuestion } from '@/lib/types';
+import { QuizQuestion, ChineseWord } from '@/lib/types';
+import { getAllWords } from '@/lib/hsk';
+import { speakText, stopSpeaking } from '@/lib/tts';
 import AppLayout from '@/components/AppLayout';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useAuthGuard } from '@/components/useAuthGuard';
@@ -18,13 +20,11 @@ export default function QuizPage() {
   usePageTitle('小测验');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-  const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [orderedSentences, setOrderedSentences] = useState<string[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
   const profileRef = useRef(getClientProfile());
 
   useEffect(() => {
@@ -38,26 +38,28 @@ export default function QuizPage() {
       profileRef.current = profile;
 
       const task = await getTodayTask(profile) as any;
-      const words = task?.article?.weakChars?.map((c: string) => ({ word: c, hskLevel: profile.hskLevel })) || [];
-      const quiz = generateQuiz(words, task?.article);
-      setQuestions(quiz);
-      if (quiz[1]?.options) {
-        setOrderedSentences([...quiz[1].options]);
+      if (!task?.article) {
+        router.replace('/daily');
+        return;
       }
+
+      // Resolve weak chars to actual ChineseWord objects
+      const allWords = getAllWords();
+      const weakWordObjects: ChineseWord[] = (task.article.weakChars || [])
+        .flatMap((char: string) => allWords.filter(w => w.word.includes(char)))
+        .filter((w: ChineseWord, i: number, arr: ChineseWord[]) => arr.findIndex(x => x.word === w.word) === i);
+
+      const quiz = generateQuiz(weakWordObjects, task.article, profile.hskLevel);
+      setQuestions(quiz);
       setInitialized(true);
     };
     init();
   }, [authorized, router]);
 
-  const handleAnswer = (answer: string | string[]) => {
+  const handleAnswer = (answer: string) => {
     if (!questions[currentQ]) return;
     const q = questions[currentQ];
     const correct = checkAnswer(q, answer);
-
-    setAnswers(prev => ({
-      ...prev,
-      [q.id]: answer,
-    }));
 
     if (correct) {
       setScore(prev => prev + 5);
@@ -82,37 +84,31 @@ export default function QuizPage() {
     }, 1500);
   };
 
-  const handleSelectOption = (index: number) => {
-    if (showFeedback) return;
-    setSelectedOption(index);
+  const handlePlayAudio = () => {
+    if (!questions[currentQ]?.audioText) return;
+    setIsPlaying(true);
+    stopSpeaking();
+    speakText(questions[currentQ].audioText!, {
+      rate: 0.75,
+      onEnd: () => setIsPlaying(false),
+    });
+  };
 
+  const handleSelectOption = (index: number) => {
+    if (showFeedback || isPlaying) return;
+    setSelectedOption(index);
     const q = questions[currentQ];
     if (!q) return;
-
-    if (q.type === 'word_meaning' || q.type === 'fill_blank') {
-      handleAnswer(q.options![index]);
-    }
+    handleAnswer(q.options[index]);
   };
 
-  const handleReorder = (index: number, direction: 'up' | 'down') => {
-    if (showFeedback) return;
-    const newOrder = [...orderedSentences];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= newOrder.length) return;
-    [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
-    setOrderedSentences(newOrder);
-  };
-
-  const handleSubmitOrder = () => {
-    handleAnswer(orderedSentences);
-  };
+  const [showResult, setShowResult] = useState(false);
 
   if (!initialized || questions.length === 0) {
     return <LoadingScreen text="准备题目中..." />;
   }
 
   if (showResult) {
-    // Update profile once at the end
     const profile = profileRef.current;
     if (profile) {
       const today = new Date().toISOString().split('T')[0];
@@ -194,19 +190,46 @@ export default function QuizPage() {
             {/* Question type indicator */}
             <div className="text-center mb-4">
               <span className="text-xs bg-amber-100 text-amber-700 px-3 py-1 rounded-full font-medium">
-                {q.type === 'word_meaning' ? '✏️ 字义选择' :
-                 q.type === 'sentence_order' ? '🔤 句子排序' : '📝 语境填空'}
+                {q.type === 'weak_word' ? '✏️ 字词练习' :
+                 q.type === 'listening' ? '🔊 听力理解' : '📝 语境填空'}
               </span>
             </div>
 
-            {q.type === 'word_meaning' && q.word && (
+            {/* Q1: Weak Word Test */}
+            {q.type === 'weak_word' && (
               <>
                 <div className="text-center mb-6">
-                  <div className="text-5xl font-bold text-gray-800 mb-3">{q.word.word}</div>
-                  <p className="text-gray-500">选择正确的意思</p>
+                  {q.prompt?.includes('____') ? (
+                    // Fill-in-the-blank mode (HSK 4+)
+                    <div className="bg-amber-50 rounded-2xl p-6 mb-4 text-lg leading-relaxed text-center">
+                      {q.sentence?.split(/(____)/).map((part, i) => (
+                        part === '____'
+                          ? <span key={i} className="inline-block w-16 border-b-2 border-amber-400 mx-1">&nbsp;</span>
+                          : <span key={i}>{part}</span>
+                      ))}
+                    </div>
+                  ) : q.prompt?.startsWith('选择') ? (
+                    // Synonym mode (HSK 7-9)
+                    <>
+                      <div className="text-3xl font-bold text-gray-800 mb-3">
+                        {q.word?.word}
+                      </div>
+                      <p className="text-gray-500 text-sm">{q.prompt}</p>
+                    </>
+                  ) : (
+                    // Char/word meaning test (HSK 1-3)
+                    <>
+                      <div className="text-5xl font-bold text-gray-800 mb-3">
+                        {q.prompt}
+                      </div>
+                      <p className="text-gray-500">
+                        {q.word && q.word.word.length === 1 ? '选择正确的拼音' : '选择正确的意思'}
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {q.options?.map((opt, i) => (
+                  {q.options.map((opt, i) => (
                     <button
                       key={i}
                       onClick={() => handleSelectOption(i)}
@@ -232,49 +255,73 @@ export default function QuizPage() {
               </>
             )}
 
-            {q.type === 'sentence_order' && (
+            {/* Q2: Listening Comprehension */}
+            {q.type === 'listening' && (
               <>
-                <div className="text-center mb-4">
-                  <p className="text-gray-500">将这些句子排成正确的顺序</p>
+                <div className="text-center mb-6">
+                  <p className="text-gray-500 mb-4">
+                    {q.isTrueFalse
+                      ? '播放后判断你是否听到了这个词'
+                      : '播放后回答问题'}
+                  </p>
+                  <button
+                    onClick={handlePlayAudio}
+                    disabled={isPlaying}
+                    className={`
+                      w-16 h-16 rounded-full flex items-center justify-center mx-auto
+                      transition-all shadow-md
+                      ${isPlaying
+                        ? 'bg-gray-300 text-gray-500 animate-pulse'
+                        : 'bg-gradient-to-r from-amber-400 to-orange-400 text-white hover:from-amber-500 hover:to-orange-500'
+                      }
+                    `}
+                  >
+                    {isPlaying ? '🔊' : '▶️'}
+                  </button>
+                  {isPlaying && (
+                    <p className="text-xs text-amber-500 mt-2 animate-pulse">播放中...</p>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  {orderedSentences.map((sentence, i) => (
-                    <div
+
+                {q.questionText && (
+                  <div className="text-center mb-4">
+                    <p className="text-base font-medium text-gray-700">
+                      {q.questionText}
+                    </p>
+                  </div>
+                )}
+
+                <div className={q.isTrueFalse ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-2 gap-3'}>
+                  {q.options.map((opt, i) => (
+                    <button
                       key={i}
-                      className="flex items-center gap-2 bg-amber-50 rounded-xl p-3 border-2 border-amber-200"
+                      onClick={() => handleSelectOption(i)}
+                      disabled={showFeedback || isPlaying}
+                      className={`
+                        p-4 rounded-2xl text-base font-medium transition-all
+                        ${showFeedback
+                          ? opt === q.correctAnswer
+                            ? 'bg-green-100 border-2 border-green-400 text-green-700'
+                            : selectedOption === i
+                              ? 'bg-red-100 border-2 border-red-400 text-red-700'
+                              : 'bg-gray-50 border-2 border-gray-200 text-gray-400'
+                          : selectedOption === i
+                            ? 'bg-amber-400 text-white border-2 border-amber-500 scale-[0.98]'
+                            : isPlaying
+                              ? 'bg-gray-100 border-2 border-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 hover:border-amber-400'
+                        }
+                      `}
                     >
-                      <span className="text-sm font-bold text-amber-500 w-6">{i + 1}</span>
-                      <span className="flex-1 text-gray-700 text-sm">{sentence}</span>
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          onClick={() => handleReorder(i, 'up')}
-                          disabled={i === 0 || showFeedback}
-                          className="text-xs text-amber-400 hover:text-amber-600 disabled:opacity-30"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={() => handleReorder(i, 'down')}
-                          disabled={i === orderedSentences.length - 1 || showFeedback}
-                          className="text-xs text-amber-400 hover:text-amber-600 disabled:opacity-30"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </div>
+                      {opt}
+                    </button>
                   ))}
                 </div>
-                <button
-                  onClick={handleSubmitOrder}
-                  disabled={showFeedback}
-                  className="mt-4 w-full bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold py-3 rounded-xl hover:from-amber-500 hover:to-orange-500 transition-all disabled:opacity-50"
-                >
-                  确认排序
-                </button>
               </>
             )}
 
-            {q.type === 'fill_blank' && (
+            {/* Q3: Context Cloze */}
+            {q.type === 'context_cloze' && (
               <>
                 <div className="text-center mb-4">
                   <p className="text-gray-500">选择正确的字词填空</p>
@@ -287,7 +334,7 @@ export default function QuizPage() {
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {q.options?.map((opt, i) => (
+                  {q.options.map((opt, i) => (
                     <button
                       key={i}
                       onClick={() => handleSelectOption(i)}
@@ -316,13 +363,13 @@ export default function QuizPage() {
             {/* Feedback */}
             {showFeedback && (
               <div className={`mt-4 text-center font-bold text-lg animate-fade-in ${
-                answers[q.id] === q.correctAnswer || JSON.stringify(answers[q.id]) === JSON.stringify(q.correctAnswer)
+                selectedOption !== null && q.options[selectedOption] === q.correctAnswer
                   ? 'text-green-500'
                   : 'text-red-500'
               }`}>
-                {(answers[q.id] === q.correctAnswer || JSON.stringify(answers[q.id]) === JSON.stringify(q.correctAnswer))
+                {(selectedOption !== null && q.options[selectedOption] === q.correctAnswer)
                   ? '✅ 答对了！+5分'
-                  : `❌ 继续努力！+1分`}
+                  : `❌ 正确答案：${q.correctAnswer} +1分`}
               </div>
             )}
           </div>

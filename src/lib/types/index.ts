@@ -62,14 +62,24 @@ export interface Article {
   pinyinAnnotated?: boolean;
 }
 
+export type QuizQuestionType = 'weak_word' | 'listening' | 'context_cloze';
+
 export interface QuizQuestion {
   id: string;
-  type: 'word_meaning' | 'sentence_order' | 'fill_blank';
+  type: QuizQuestionType;
   word?: ChineseWord;
-  options?: string[];
-  correctAnswer: string | string[];
+  options: string[];
+  correctAnswer: string;
+  /** For weak_word Q1: the character/word prompt, or sentence context */
+  prompt?: string;
+  /** For listening Q2: text to speak via TTS */
+  audioText?: string;
+  /** For listening Q2: question to display (HSK 4+) */
+  questionText?: string;
+  /** For listening Q2 HSK 1-3: true/false mode */
+  isTrueFalse?: boolean;
+  /** For context_cloze Q3: full sentence with ____ */
   sentence?: string;
-  blankIndex?: number;
 }
 
 export interface DailySession {
