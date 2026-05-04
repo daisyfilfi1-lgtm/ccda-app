@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getClientProfile, createDefaultProfile, setClientProfile, updateClientProfile } from '@/lib/auth';
+import { listenToAuthChanges, waitForAuth, getClientProfile, createDefaultProfile, setClientProfile, updateClientProfile } from '@/lib/auth';
 import { getTodayTask, SrsTask } from '@/lib/srs';
 import { speakText, stopSpeaking, warmUpVoices } from '@/lib/tts';
 import { getWord, getWordsByLevel, getAllWords } from '@/lib/hsk';
