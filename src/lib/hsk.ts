@@ -125,12 +125,19 @@ export function getWordsByLevel(level: HskLevel): ChineseWord[] {
 }
 
 export function getAllWords(): ChineseWord[] {
-  return [...HSK_WORDS[1], ...HSK_WORDS[2], ...HSK_WORDS[3]];
+  const all: ChineseWord[] = [];
+  for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9] as HskLevel[]) {
+    const words = HSK_WORDS[level];
+    if (words) all.push(...words);
+  }
+  return all;
 }
 
 export function getWord(word: string): ChineseWord | undefined {
-  for (const level of [1, 2, 3] as HskLevel[]) {
-    const found = HSK_WORDS[level].find(w => w.word === word);
+  for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9] as HskLevel[]) {
+    const words = HSK_WORDS[level];
+    if (!words) continue;
+    const found = words.find(w => w.word === word);
     if (found) return found;
   }
   return undefined;
@@ -172,9 +179,8 @@ export function getCharsByLevel(_level: number): string[] {
 
 export function getCharToWordIndex(): Map<string, string[]> {
   const idx = new Map<string, string[]>();
-  const levels = [1, 2, 3] as const;
-  for (const level of levels) {
-    const words = HSK_WORDS[level as HskLevel];
+  for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9] as HskLevel[]) {
+    const words = HSK_WORDS[level];
     if (!words) continue;
     for (const w of words) {
       for (const ch of w.word) {

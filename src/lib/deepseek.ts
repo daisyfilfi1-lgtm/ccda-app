@@ -8,12 +8,14 @@ const DEEPSEEK_MODEL = 'deepseek-chat';
 
 // --- Rich fallback story templates with character+plot structure ---
 
-const STORY_TEMPLATES: {
+interface StoryTemplate {
   title: string;
   setup: string;
   problem: string;
   resolution: string;
-}[] = [
+}
+
+const STORY_TEMPLATES: StoryTemplate[] = [
   {
     title: '小明的秘密基地',
     setup: '{player}在{place}发现了一个秘密的地方。那里有{object}和{object2}，非常漂亮。',
@@ -46,6 +48,22 @@ const STORY_TEMPLATES: {
   },
 ];
 
+// Higher-level story templates for HSK 7+ — richer narratives, abstract themes, more complex sentence structures
+const HIGHER_STORY_TEMPLATES: StoryTemplate[] = [
+  {
+    title: '星空下的约定',
+    setup: '{player}从小就喜欢仰望星空。每当夜幕降临，{player}就会爬到{place}的屋顶上，望着满天繁星发呆。"你知道吗？" {player}对{friend}说，"每一颗星星都可能是一个遥远的世界。"{friend}若有所思地点了点头。',
+    problem: '有一天，{player}在{place2}发现了一颗从未见过的流星。它发出的光芒与其他星星截然不同——那是一种{object}般的蓝色。{player}决定用{object2}记录下这颗星星的轨迹。但是，{person}告诉{player}，那颗"星星"可能是一颗正在接近地球的小行星。',
+    resolution: '{player}并没有被这个消息吓到。相反，{player}开始查阅大量关于天文学的书籍，还加入了学校的天文俱乐部。经过几个月的观察和研究，{player}发现那其实是一颗周期为{number}年的彗星。{player}将自己的发现写成了一篇报告，在全区的科学竞赛中获得了一等奖。评委{judge}评价道："这份研究的深度和热情，令人印象深刻。"',
+  },
+  {
+    title: '穿越时空的来信',
+    setup: '那是一个普通的星期三下午。{player}正在{place}整理旧物，突然从一本泛黄的{object}里掉出了一封信。信的开头写着："亲爱的未来的我……" {player}好奇地读了下去，发现这封信竟然是十年前自己写给未来的。那时候，{player}还是一个刚学会{action}的小孩子。',
+    problem: '信的最后一行写道："十年后的我，你实现我们的梦想了吗？" {player}愣住了。这些年来，{player}一直在努力学习，却似乎忘记了当初最纯粹的热爱。{friend}看出了{player}的心事，建议道："为什么不从现在开始重新追梦呢？"',
+    resolution: '{player}深受触动，决定每天抽出一点时间重新练习{action}。起初并不顺利，{coach}指出{player}的基础虽然扎实但缺乏创新。{player}没有放弃，而是更加刻苦地训练，同时阅读了大量关于{concept}的书籍。半年后，{player}参加了全市的比赛。虽然没有获得第一名，但{player}在日记中写道："我终于找回了那个敢于做梦的自己。"',
+  },
+];
+
 interface StoryContext {
   player: string;
   friend: string;
@@ -75,12 +93,20 @@ function randomPick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function generateStoryContext(): StoryContext {
+function generateStoryContext(hskLevel: HskLevel = 3): StoryContext {
+  // Higher-level contexts use richer vocabulary sets
+  const names = hskLevel >= 7
+    ? ['小明', '小红', '小华', '小丽', '小刚', '朵朵', '乐乐', '天天', '子涵', '梓萱']
+    : ALL_NAMES;
+  const animals = hskLevel >= 7
+    ? ['小白兔', '小花猫', '金毛犬', '小松鼠', '小刺猬', '小鸭子', '小熊猫', '小猴子', '梅花鹿', '白天鹅']
+    : ALL_ANIMALS;
+
   return {
-    player: randomPick(ALL_NAMES),
-    friend: randomPick(ALL_NAMES.filter(n => n !== undefined)).trim() || randomPick(ALL_NAMES),
-    animal: randomPick(ALL_ANIMALS),
-    animal2: randomPick(ALL_ANIMALS.filter(a => a !== undefined)).trim() || randomPick(ALL_ANIMALS),
+    player: randomPick(names),
+    friend: randomPick(names.filter(n => n !== undefined)).trim() || randomPick(names),
+    animal: randomPick(animals),
+    animal2: randomPick(animals.filter(a => a !== undefined)).trim() || randomPick(animals),
     place: randomPick(ALL_PLACES),
     object: randomPick(ALL_OBJECTS),
     object2: randomPick(ALL_OBJECTS.filter(o => o !== undefined)).trim() || randomPick(ALL_OBJECTS),
@@ -135,10 +161,14 @@ export function generateFallbackArticle(
   newWords: ChineseWord[],
   weakChars: string[],
 ): Article {
-  // Pick a story template based on interests
+  // Pick a story template based on interests and level
   const tag = interestTags[0]?.toLowerCase() || '';
+
+  // For HSK 7+, use richer story templates with more complex vocabulary
   let template;
-  if (tag.includes('minecraft') || tag.includes('游戏')) {
+  if (hskLevel >= 7) {
+    template = randomPick(HIGHER_STORY_TEMPLATES);
+  } else if (tag.includes('minecraft') || tag.includes('游戏')) {
     template = STORY_TEMPLATES[0]; // adventure
   } else if (tag.includes('恐龙') || tag.includes('动物')) {
     template = STORY_TEMPLATES[1]; // competition
@@ -148,7 +178,7 @@ export function generateFallbackArticle(
     template = randomPick(STORY_TEMPLATES);
   }
 
-  const ctx = generateStoryContext();
+  const ctx = generateStoryContext(hskLevel);
 
   let story = `${template.setup}\n\n${template.problem}\n\n${template.resolution}`;
   story = injectWords(story, newWords, ctx);
@@ -212,7 +242,7 @@ function buildPrompt(
 
 请写一篇有趣的**故事**，要求：
 
-【读者水平】HSK ${hskLevel}级（适合${hskLevel === 1 ? '初学者' : hskLevel === 2 ? '初级' : hskLevel === 3 ? '初中级' : '中级'}水平的孩子独立阅读）
+【读者水平】HSK ${hskLevel}级（适合${levelDesc(hskLevel)}水平的孩子独立阅读）
 
 【兴趣主题】${interestStr}
 
@@ -234,6 +264,15 @@ function buildPrompt(
 
 function getApiKey(): string {
   return process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || '';
+}
+
+function levelDesc(level: HskLevel): string {
+  const map: Record<HskLevel, string> = {
+    1: '初学者', 2: '初级', 3: '初中级',
+    4: '中级', 5: '中高级', 6: '高级',
+    7: '流利', 8: '精通', 9: '大师',
+  };
+  return map[level] || '中级';
 }
 
 export async function createDailyArticle(
@@ -306,6 +345,9 @@ function getWordCountTarget(hskLevel: HskLevel): number {
     case 4: return 300;
     case 5: return 400;
     case 6: return 500;
+    case 7: return 650;
+    case 8: return 800;
+    case 9: return 1000;
     default: return 150;
   }
 }

@@ -8,6 +8,9 @@ import { speakText, stopSpeaking, warmUpVoices } from '@/lib/tts';
 import { getWord, getWordsByLevel, getAllWords } from '@/lib/hsk';
 import { initLexicon } from '@/lib/lexicon';
 import { ChineseWord } from '@/lib/types';
+import AppLayout from '@/components/AppLayout';
+import LoadingScreen from '@/components/LoadingScreen';
+import { usePageTitle } from '@/components/usePageTitle';
 
 function CharPopup({ char, onClose }: { char: string; onClose: () => void }) {
   const word = char.length > 1 ? getWord(char) : getWord(char);
@@ -60,8 +63,10 @@ function CharPopup({ char, onClose }: { char: string; onClose: () => void }) {
 
 export default function DailyPage() {
   const router = useRouter();
+  usePageTitle('今日阅读');
   const [task, setTask] = useState<SrsTask | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [showPinyin, setShowPinyin] = useState(true);
   const [popupChar, setPopupChar] = useState<string | null>(null);
   const [readingComplete, setReadingComplete] = useState(false);
@@ -76,9 +81,11 @@ export default function DailyPage() {
       const cleanup = listenToAuthChanges();
       const auth = await waitForAuth();
       if (!auth) {
-        router.replace('/login');
+        router.replace('/auth');
         return;
       }
+      setAuthReady(true);
+
       let profile = getClientProfile();
       if (!profile) {
         profile = createDefaultProfile(auth);
@@ -98,6 +105,7 @@ export default function DailyPage() {
       setShowPinyin(profile.hskLevel <= 2);
       warmUpVoices();
       setInitialized(true);
+      return () => cleanup();
     };
     init();
   }, [router]);
@@ -152,32 +160,27 @@ export default function DailyPage() {
   };
 
   if (!initialized || !task) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-        <div className="text-center animate-fade-in">
-          <div className="text-5xl mb-4 animate-bounce">📖</div>
-          <div className="text-xl font-bold text-amber-600">准备今日文章...</div>
-        </div>
-      </div>
-    );
+    return <LoadingScreen text="准备今日文章..." />;
   }
 
   if (readingComplete) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-        <div className="text-center animate-fade-in">
-          <div className="text-8xl mb-4 animate-bounce-in">🎉</div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">读完了！</h2>
-          <p className="text-gray-500 mb-2">真棒！来做个小测验吧</p>
-          <p className="text-amber-500 text-lg font-bold">{navCountdown} 秒后自动跳转...</p>
-          <button
-            onClick={() => router.push('/quiz')}
-            className="mt-4 bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all"
-          >
-            现在就去 →
-          </button>
+      <AppLayout showTabBar={true}>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center animate-fade-in">
+            <div className="text-8xl mb-4 animate-bounce-in">🎉</div>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">读完了！</h2>
+            <p className="text-gray-500 mb-2">真棒！来做个小测验吧</p>
+            <p className="text-amber-500 text-lg font-bold">{navCountdown} 秒后自动跳转...</p>
+            <button
+              onClick={() => router.push('/quiz')}
+              className="mt-4 bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl active:scale-[0.97] transition-all"
+            >
+              现在就去 →
+            </button>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -186,7 +189,7 @@ export default function DailyPage() {
   const knownWordSet = new Set(allKnownWords);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 flex flex-col">
+    <AppLayout showTabBar={false}>
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-amber-100 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
@@ -222,7 +225,6 @@ export default function DailyPage() {
             <div className="space-y-3 leading-relaxed text-lg">
               {task.article.content.split('\n').filter(Boolean).map((line, lineIdx) => (
                 <p key={lineIdx} className="text-gray-700">
-                  {/* Split line into Chinese chars and non-Chinese, render each char clickable */}
                   {(() => {
                     const elements: React.ReactNode[] = [];
                     let i = 0;
@@ -251,7 +253,6 @@ export default function DailyPage() {
                       const wordSlice = line.slice(i, i + matchedLen);
                       const wordInfo = getWord(wordSlice);
 
-                      // Show badge for multi-char known words
                       const isMultiCharWord = matchedLen > 1 && knownWordSet.has(wordSlice);
 
                       elements.push(
@@ -280,7 +281,6 @@ export default function DailyPage() {
                               </span>
                             ))}
                           </span>
-                          {/* 词/字标签已移除 — 不再干扰阅读体验 */}
                         </span>
                       );
                       i += matchedLen;
@@ -297,7 +297,7 @@ export default function DailyPage() {
       {/* Char popup */}
       {popupChar && <CharPopup char={popupChar} onClose={() => setPopupChar(null)} />}
 
-      {/* Bottom controls — button always clickable */}
+      {/* Bottom controls */}
       <div className="bg-white/80 backdrop-blur-sm border-t border-amber-100 px-4 py-3 sticky bottom-0">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
@@ -322,6 +322,6 @@ export default function DailyPage() {
           </button>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

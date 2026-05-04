@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { listenToAuthChanges } from "@/lib/auth";
+import { usePageTitle } from '@/components/usePageTitle';
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,7 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  usePageTitle(mode === 'signup' ? '注册' : '登录');
 
   useEffect(() => {
     return listenToAuthChanges();

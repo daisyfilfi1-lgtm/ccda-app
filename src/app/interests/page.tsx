@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { getClientAuth, getClientProfile, setClientProfile, createDefaultProfile } from '@/lib/auth';
+import AppLayout from '@/components/AppLayout';
+import { useAuthGuard } from '@/components/useAuthGuard';
+import { usePageTitle } from '@/components/usePageTitle';
 
 interface InterestTag {
   id: string;
@@ -42,17 +45,18 @@ const INTEREST_TAGS: InterestTag[] = [
 
 export default function InterestsPage() {
   const router = useRouter();
+  const authorized = useAuthGuard();
+  usePageTitle('选择兴趣');
   const [selected, setSelected] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    const auth = getClientAuth();
-    if (!auth) {
-      router.replace('/login');
-      return;
+    if (authorized) {
+      setInitialized(true);
     }
-    setInitialized(true);
-  }, [router]);
+  }, [authorized]);
+
+  if (!initialized) return null;
 
   const toggleInterest = (id: string) => {
     if (selected.includes(id)) {
@@ -76,171 +80,171 @@ export default function InterestsPage() {
       interests: selected,
       onboarding_completed: true,
     }).eq('id', user.id);
-    
+
     const auth = getClientAuth();
     const existing = getClientProfile();
     const profile = existing || createDefaultProfile(auth!);
-    
+
     setClientProfile({ ...profile, interests: selected });
     router.push('/daily');
   };
 
-  if (!initialized) return null;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 p-4 flex items-center justify-center">
-      <div className="max-w-lg w-full animate-fade-in">
-        <div className="bg-white rounded-3xl shadow-lg shadow-amber-100 p-8">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <div className="text-5xl mb-3">🎯</div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              你对什么感兴趣？
-            </h1>
-            <p className="text-gray-500 text-sm">
-              选择3个你最感兴趣的话题，我会为你写相关的故事！
-            </p>
-            <div className="text-amber-500 font-bold mt-2">
-              已选 {selected.length}/3
+    <AppLayout showTabBar={false}>
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <div className="max-w-lg w-full animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-lg shadow-amber-100 p-8">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="text-5xl mb-3">🎯</div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                你对什么感兴趣？
+              </h1>
+              <p className="text-gray-500 text-sm">
+                选择3个你最感兴趣的话题，我会为你写相关的故事！
+              </p>
+              <div className="text-amber-500 font-bold mt-2">
+                已选 {selected.length}/3
+              </div>
             </div>
-          </div>
 
-          {/* Category: 游戏 */}
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🎮 游戏</h3>
-            <div className="grid grid-cols-4 gap-2">
-              {INTEREST_TAGS.filter(t => t.category === '游戏').map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleInterest(tag.id)}
-                  className={`
-                    p-3 rounded-2xl text-center transition-all duration-200
-                    ${selected.includes(tag.id)
-                      ? 'bg-amber-400 text-white shadow-md scale-105 border-2 border-amber-500'
-                      : 'bg-amber-50 text-gray-700 hover:bg-amber-100 border-2 border-transparent'
-                    }
-                    ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
-                  `}
-                >
-                  <div className="text-2xl mb-1">{tag.emoji}</div>
-                  <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
-                </button>
-              ))}
+            {/* Category: 游戏 */}
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🎮 游戏</h3>
+              <div className="grid grid-cols-4 gap-2">
+                {INTEREST_TAGS.filter(t => t.category === '游戏').map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleInterest(tag.id)}
+                    className={`
+                      p-3 rounded-2xl text-center transition-all duration-200
+                      ${selected.includes(tag.id)
+                        ? 'bg-amber-400 text-white shadow-md scale-105 border-2 border-amber-500'
+                        : 'bg-amber-50 text-gray-700 hover:bg-amber-100 border-2 border-transparent'
+                      }
+                      ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
+                    `}
+                  >
+                    <div className="text-2xl mb-1">{tag.emoji}</div>
+                    <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Category: 运动 */}
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">⚽ 运动</h3>
-            <div className="grid grid-cols-4 gap-2">
-              {INTEREST_TAGS.filter(t => t.category === '运动').map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleInterest(tag.id)}
-                  className={`
-                    p-3 rounded-2xl text-center transition-all duration-200
-                    ${selected.includes(tag.id)
-                      ? 'bg-emerald-400 text-white shadow-md scale-105 border-2 border-emerald-500'
-                      : 'bg-emerald-50 text-gray-700 hover:bg-emerald-100 border-2 border-transparent'
-                    }
-                    ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
-                  `}
-                >
-                  <div className="text-2xl mb-1">{tag.emoji}</div>
-                  <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
-                </button>
-              ))}
+            {/* Category: 运动 */}
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">⚽ 运动</h3>
+              <div className="grid grid-cols-4 gap-2">
+                {INTEREST_TAGS.filter(t => t.category === '运动').map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleInterest(tag.id)}
+                    className={`
+                      p-3 rounded-2xl text-center transition-all duration-200
+                      ${selected.includes(tag.id)
+                        ? 'bg-emerald-400 text-white shadow-md scale-105 border-2 border-emerald-500'
+                        : 'bg-emerald-50 text-gray-700 hover:bg-emerald-100 border-2 border-transparent'
+                      }
+                      ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
+                    `}
+                  >
+                    <div className="text-2xl mb-1">{tag.emoji}</div>
+                    <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Category: 自然 */}
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🌿 自然</h3>
-            <div className="grid grid-cols-4 gap-2">
-              {INTEREST_TAGS.filter(t => t.category === '自然').map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleInterest(tag.id)}
-                  className={`
-                    p-3 rounded-2xl text-center transition-all duration-200
-                    ${selected.includes(tag.id)
-                      ? 'bg-sky-400 text-white shadow-md scale-105 border-2 border-sky-500'
-                      : 'bg-sky-50 text-gray-700 hover:bg-sky-100 border-2 border-transparent'
-                    }
-                    ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
-                  `}
-                >
-                  <div className="text-2xl mb-1">{tag.emoji}</div>
-                  <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
-                </button>
-              ))}
+            {/* Category: 自然 */}
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🌿 自然</h3>
+              <div className="grid grid-cols-4 gap-2">
+                {INTEREST_TAGS.filter(t => t.category === '自然').map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleInterest(tag.id)}
+                    className={`
+                      p-3 rounded-2xl text-center transition-all duration-200
+                      ${selected.includes(tag.id)
+                        ? 'bg-sky-400 text-white shadow-md scale-105 border-2 border-sky-500'
+                        : 'bg-sky-50 text-gray-700 hover:bg-sky-100 border-2 border-transparent'
+                      }
+                      ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
+                    `}
+                  >
+                    <div className="text-2xl mb-1">{tag.emoji}</div>
+                    <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Category: 生活 */}
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🏠 生活</h3>
-            <div className="grid grid-cols-4 gap-2">
-              {INTEREST_TAGS.filter(t => t.category === '生活').map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleInterest(tag.id)}
-                  className={`
-                    p-3 rounded-2xl text-center transition-all duration-200
-                    ${selected.includes(tag.id)
-                      ? 'bg-pink-400 text-white shadow-md scale-105 border-2 border-pink-500'
-                      : 'bg-pink-50 text-gray-700 hover:bg-pink-100 border-2 border-transparent'
-                    }
-                    ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
-                  `}
-                >
-                  <div className="text-2xl mb-1">{tag.emoji}</div>
-                  <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
-                </button>
-              ))}
+            {/* Category: 生活 */}
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🏠 生活</h3>
+              <div className="grid grid-cols-4 gap-2">
+                {INTEREST_TAGS.filter(t => t.category === '生活').map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleInterest(tag.id)}
+                    className={`
+                      p-3 rounded-2xl text-center transition-all duration-200
+                      ${selected.includes(tag.id)
+                        ? 'bg-pink-400 text-white shadow-md scale-105 border-2 border-pink-500'
+                        : 'bg-pink-50 text-gray-700 hover:bg-pink-100 border-2 border-transparent'
+                      }
+                      ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
+                    `}
+                  >
+                    <div className="text-2xl mb-1">{tag.emoji}</div>
+                    <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Category: 文化 */}
-          <div className="mb-6">
-            <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🏮 文化</h3>
-            <div className="grid grid-cols-4 gap-2">
-              {INTEREST_TAGS.filter(t => t.category === '文化').map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleInterest(tag.id)}
-                  className={`
-                    p-3 rounded-2xl text-center transition-all duration-200
-                    ${selected.includes(tag.id)
-                      ? 'bg-violet-400 text-white shadow-md scale-105 border-2 border-violet-500'
-                      : 'bg-violet-50 text-gray-700 hover:bg-violet-100 border-2 border-transparent'
-                    }
-                    ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
-                  `}
-                >
-                  <div className="text-2xl mb-1">{tag.emoji}</div>
-                  <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
-                </button>
-              ))}
+            {/* Category: 文化 */}
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">🏮 文化</h3>
+              <div className="grid grid-cols-4 gap-2">
+                {INTEREST_TAGS.filter(t => t.category === '文化').map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleInterest(tag.id)}
+                    className={`
+                      p-3 rounded-2xl text-center transition-all duration-200
+                      ${selected.includes(tag.id)
+                        ? 'bg-violet-400 text-white shadow-md scale-105 border-2 border-violet-500'
+                        : 'bg-violet-50 text-gray-700 hover:bg-violet-100 border-2 border-transparent'
+                      }
+                      ${selected.length >= 3 && !selected.includes(tag.id) ? 'opacity-40' : ''}
+                    `}
+                  >
+                    <div className="text-2xl mb-1">{tag.emoji}</div>
+                    <div className="text-[10px] font-medium leading-tight">{tag.label}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Confirm button */}
-          <button
-            onClick={handleConfirm}
-            disabled={selected.length !== 3}
-            className={`
-              w-full py-4 rounded-2xl font-bold text-lg transition-all
-              ${selected.length === 3
-                ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-md hover:shadow-lg active:scale-[0.98]'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }
-            `}
-          >
-            {selected.length === 3 ? '开始读故事吧！📖' : `再选 ${3 - selected.length} 个`}
-          </button>
+            {/* Confirm button */}
+            <button
+              onClick={handleConfirm}
+              disabled={selected.length !== 3}
+              className={`
+                w-full py-4 rounded-2xl font-bold text-lg transition-all
+                ${selected.length === 3
+                  ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-md hover:shadow-lg active:scale-[0.98]'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }
+              `}
+            >
+              {selected.length === 3 ? '开始读故事吧！📖' : `再选 ${3 - selected.length} 个`}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

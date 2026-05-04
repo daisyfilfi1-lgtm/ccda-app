@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { listenToAuthChanges, waitForAuth } from '@/lib/auth';
+import { usePageTitle } from '@/components/usePageTitle';
 
 const features = [
   {
@@ -25,6 +26,7 @@ const features = [
 export default function HomePage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
+  usePageTitle('首页');
 
   useEffect(() => {
     const init = async () => {

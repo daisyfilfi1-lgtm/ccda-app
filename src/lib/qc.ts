@@ -1,6 +1,5 @@
 import { ChineseWord, QuizQuestion } from './types';
 import { getWordsByLevel } from './hsk';
-import { getEntry } from './lexicon';
 
 // Generate quiz questions after reading an article
 export function generateQuiz(
@@ -12,7 +11,7 @@ export function generateQuiz(
   // Q1: Word meaning (4 choices)
   if (articleWords.length > 0) {
     const targetWord = articleWords[Math.floor(Math.random() * articleWords.length)];
-    const allWords = getWordsByLevel(targetWord.hskLevel as any);
+    const allWords = getWordsByLevel(targetWord.hskLevel);
     const distractors = allWords
       .filter(w => w.word !== targetWord.word)
       .sort(() => Math.random() - 0.5)
@@ -51,13 +50,21 @@ export function generateQuiz(
   // Q3: Fill in the blank
   if (articleWords.length > 0) {
     const fillWord = articleWords[Math.floor(Math.random() * articleWords.length)];
-    const allWords = getWordsByLevel(fillWord.hskLevel as any);
+    const allWords = getWordsByLevel(fillWord.hskLevel);
     const fillDistractors = allWords
       .filter(w => w.word !== fillWord.word)
       .sort(() => Math.random() - 0.5)
       .slice(0, 3);
 
-    const sentence = `我看见了一个${fillWord.word}，它真好看！`;
+    // Pick a sentence from the article content for fill-blank (more contextual for higher levels)
+    const articleSentences = article.content
+      .replace(/[。！？\n]/g, '|')
+      .split('|')
+      .filter(s => s.trim().length > 3 && s.includes(fillWord.word))
+      .sort(() => Math.random() - 0.5);
+    const sentence = articleSentences.length > 0
+      ? articleSentences[0].trim()
+      : `我看见了一个${fillWord.word}，它真好看！`;
     const blankSentence = sentence.replace(fillWord.word, '____');
 
     questions.push({

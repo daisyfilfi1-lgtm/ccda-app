@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { listenToAuthChanges, waitForAuth } from "@/lib/auth";
+import { usePageTitle } from '@/components/usePageTitle';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  usePageTitle('验证中');
 
   useEffect(() => {
     const handleCallback = async () => {

@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { createServerSideClient } from '@/lib/supabase';
 
 const protectedRoutes = ['/assessment', '/daily', '/interests', '/quiz', '/achievement', '/onboarding'];
-const publicRoutes = ['/auth', '/login', '/parent-report'];
+const publicRoutes = ['/auth', '/parent-report'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

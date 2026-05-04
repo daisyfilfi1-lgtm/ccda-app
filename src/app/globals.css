@@ -97,3 +97,8 @@ body {
 @keyframes progress-fill {
   from { width: 0%; }
 }
+
+/* Safe area for notch phones (iOS) */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
