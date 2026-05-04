@@ -258,16 +258,6 @@ function getSentenceForWord(word: string, ctx: StoryContext): string {
   return randomPick(templates);
 }
 
-function injectWords(text: string, newWords: ChineseWord[], ctx: StoryContext): string {
-  if (newWords.length === 0) return text;
-
-  let result = text;
-  for (const w of newWords) {
-    result += getSentenceForWord(w.word, ctx);
-  }
-  return result;
-}
-
 export function generateFallbackArticle(
   hskLevel: HskLevel,
   interestTags: string[],
@@ -293,10 +283,10 @@ export function generateFallbackArticle(
 
   const ctx = generateStoryContext(hskLevel);
 
+  // Step 1: Build story with placeholders
   let story = `${template.setup}\n\n${template.problem}\n\n${template.resolution}`;
-  story = injectWords(story, newWords, ctx);
 
-  // Fill template placeholders
+  // Step 2: Fill template placeholders FIRST (so injectWords gets resolved names)
   story = story
     .replace(/{player}/g, ctx.player)
     .replace(/{friend}/g, ctx.friend)
@@ -313,7 +303,11 @@ export function generateFallbackArticle(
     .replace(/{twist}/g, ctx.twist)
     .replace(/{food}/g, ctx.food);
 
+  // Step 3: Inject target words as a natural post-story word practice section
+  const wordSentences = newWords.map(w => getSentenceForWord(w.word, ctx)).join('');
+
   // Insert weak chars naturally as part of the character's actions
+  let charSentences = '';
   if (weakChars.length > 0) {
     const chars = weakChars.slice(0, 3);
     for (const ch of chars) {
@@ -323,8 +317,15 @@ export function generateFallbackArticle(
         ` ${ctx.player}仔细看了看"${ch}"字，记住了它的样子。`,
         ` "${ch}字真有趣！"${ctx.player}笑着说。`,
       ];
-      story += randomPick(charTemplates);
+      charSentences += randomPick(charTemplates);
     }
+  }
+
+  // Append word + char sentences at end, separated by a blank line
+  if (wordSentences || charSentences) {
+    story += `\n\n`;
+    if (wordSentences) story += wordSentences;
+    if (charSentences) story += charSentences;
   }
 
   const title = template.title;
