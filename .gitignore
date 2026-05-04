@@ -13,9 +13,10 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# nextjs
+.next/
+.next-old/
+node_modules/
 
 # production
 /build
