@@ -2,188 +2,159 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getClientAuth, getClientProfile } from '@/lib/auth';
-import { getMasteryStats, getCharMasteryStats, getWeakChars } from '@/lib/lexicon';
-
-const HSK_BANDS = [
-  { level: '1-3', label: '初级', color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
-  { level: '4-6', label: '中级', color: 'bg-amber-100 text-amber-700 border-amber-300' },
-  { level: '7-9', label: '高级', color: 'bg-violet-100 text-violet-700 border-violet-300' },
-];
+import { getClientAuth, getClientProfile, clearClientAuth } from '@/lib/auth';
+import { getMasteryStats, getCharMasteryStats, getWeakChars, getCharCloud } from '@/lib/lexicon';
+import AppLayout from '@/components/AppLayout';
+import { useAuthGuard } from '@/components/useAuthGuard';
+import { usePageTitle } from '@/components/usePageTitle';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const authorized = useAuthGuard();
+  usePageTitle('个人主页');
   const [profile, setProfile] = useState(getClientProfile());
-  const [authorized, setAuthorized] = useState(false);
+  const [wordStats, setWordStats] = useState({ mastered: 0, learning: 0, new: 0 });
+  const [charStats, setCharStats] = useState({ mastered: 0, learning: 0, new: 0 });
+  const [weakCharCount, setWeakCharCount] = useState(0);
+  const [charProgress, setCharProgress] = useState(0);
 
   useEffect(() => {
-    const auth = getClientAuth();
-    if (!auth) {
-      router.replace('/login');
-      return;
-    }
+    if (!authorized) return;
     setProfile(getClientProfile());
-    setAuthorized(true);
-  }, [router]);
+    setWordStats(getMasteryStats());
+    setCharStats(getCharMasteryStats());
+    setWeakCharCount(getWeakChars().length);
+
+    // Compute overall char progress
+    const cloud = getCharCloud();
+    if (cloud.length > 0) {
+      const avg = cloud.reduce((s, c) => s + c.mastery, 0) / cloud.length;
+      setCharProgress(Math.round(avg));
+    }
+  }, [authorized]);
 
   if (!authorized) return null;
 
-  const wordStats = getMasteryStats();
-  const charStats = getCharMasteryStats();
-  const wordTotal = wordStats.mastered + wordStats.learning + wordStats.new;
-  const charTotal = charStats.mastered + charStats.learning + charStats.new;
-  const weakChars = getWeakChars();
-  const hskLevel = profile?.hskLevel || 1;
-  const totalRead = profile?.totalRead || 0;
-  const streakDays = profile?.streakDays || 0;
-  const points = profile?.points || 0;
-  const interests = profile?.interests || [];
-
-  const levelBand = hskLevel <= 3 ? '1-3' : hskLevel <= 6 ? '4-6' : '7-9';
-  const bandLabel = HSK_BANDS.find(b => b.level === levelBand);
+  const p = profile || { name: '用户', streakDays: 0, totalRead: 0, points: 0, hskLevel: 1 };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 p-4">
-      <div className="max-w-lg mx-auto space-y-4 pb-8">
-
-        {/* Profile Header */}
+    <AppLayout showTabBar={true}>
+      <div className="p-4 space-y-4">
+        {/* Profile card */}
         <div className="bg-white rounded-3xl shadow-lg shadow-amber-100 p-6 text-center">
-          {/* Avatar */}
-          <div className="text-6xl mb-3">
-            {profile?.name ? '👤' : '😊'}
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            {profile?.name || '用户'}
-          </h1>
-          <div className="flex items-center justify-center gap-2 mt-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${bandLabel?.color || 'bg-gray-100 text-gray-500'}`}>
-              HSK {hskLevel} · {bandLabel?.label || ''}
-            </span>
-          </div>
-          {interests.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-1.5 mt-3">
-              {interests.map(tag => (
-                <span key={tag} className="bg-amber-50 text-amber-600 text-xs px-2.5 py-1 rounded-full border border-amber-200">
-                  {tag}
-                </span>
-              ))}
+          <div className="text-6xl mb-3">👤</div>
+          <h1 className="text-2xl font-bold text-gray-800">{p.name}</h1>
+          <p className="text-sm text-amber-500 mt-1">HSK {p.hskLevel} 级</p>
+
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-3 mt-5">
+            <div className="bg-amber-50 rounded-2xl p-3">
+              <div className="text-2xl font-bold text-amber-600">{p.totalRead}</div>
+              <div className="text-xs text-gray-500">阅读天数</div>
             </div>
-          )}
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-2xl p-4 text-center shadow-sm shadow-amber-100">
-            <div className="text-2xl mb-1">📚</div>
-            <div className="text-xl font-bold text-amber-600">{totalRead}</div>
-            <div className="text-xs text-gray-500">已读天数</div>
-          </div>
-          <div className="bg-white rounded-2xl p-4 text-center shadow-sm shadow-amber-100">
-            <div className="text-2xl mb-1">🔥</div>
-            <div className="text-xl font-bold text-orange-600">{streakDays}</div>
-            <div className="text-xs text-gray-500">连续天数</div>
-          </div>
-          <div className="bg-white rounded-2xl p-4 text-center shadow-sm shadow-amber-100">
-            <div className="text-2xl mb-1">⭐</div>
-            <div className="text-xl font-bold text-amber-600">{points}</div>
-            <div className="text-xs text-gray-500">总积分</div>
+            <div className="bg-orange-50 rounded-2xl p-3">
+              <div className="text-2xl font-bold text-orange-600">{p.streakDays}</div>
+              <div className="text-xs text-gray-500">连续天数</div>
+            </div>
+            <div className="bg-amber-50 rounded-2xl p-3">
+              <div className="text-2xl font-bold text-amber-600">{p.points}</div>
+              <div className="text-xs text-gray-500">积分</div>
+            </div>
           </div>
         </div>
 
-        {/* Word/Char Mastery */}
+        {/* Word mastery */}
         <div className="bg-white rounded-3xl shadow-lg shadow-amber-100 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">📖 学习进度</h2>
-
-          {/* Words */}
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">字词掌握</h3>
-            <div className="flex gap-2 h-3 rounded-full overflow-hidden bg-gray-100">
-              <div className="bg-green-400 transition-all" style={{ width: `${wordTotal > 0 ? (wordStats.mastered / wordTotal) * 100 : 0}%` }} />
-              <div className="bg-amber-400 transition-all" style={{ width: `${wordTotal > 0 ? (wordStats.learning / wordTotal) * 100 : 0}%` }} />
-              <div className="bg-gray-200 transition-all flex-1" />
-            </div>
-            <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>已掌握 {wordStats.mastered}</span>
-              <span>学习中 {wordStats.learning}</span>
-              <span>未接触 {wordStats.new}</span>
-            </div>
+          <h2 className="text-lg font-bold text-gray-800 mb-3">📝 词汇掌握</h2>
+          <div className="flex gap-1 h-6 rounded-full overflow-hidden bg-gray-100">
+            <div className="bg-green-400 transition-all" style={{ width: `${wordStats.mastered / Math.max(1, wordStats.mastered + wordStats.learning + wordStats.new) * 100}%` }} />
+            <div className="bg-amber-400 transition-all" style={{ width: `${wordStats.learning / Math.max(1, wordStats.mastered + wordStats.learning + wordStats.new) * 100}%` }} />
+            <div className="bg-gray-300 transition-all" style={{ width: `${wordStats.new / Math.max(1, wordStats.mastered + wordStats.learning + wordStats.new) * 100}%` }} />
           </div>
-
-          {/* Characters */}
-          <div>
-            <h3 className="text-sm font-medium text-gray-500 mb-2">汉字掌握</h3>
-            <div className="flex gap-2 h-3 rounded-full overflow-hidden bg-gray-100">
-              <div className="bg-green-400 transition-all" style={{ width: `${charTotal > 0 ? (charStats.mastered / charTotal) * 100 : 0}%` }} />
-              <div className="bg-amber-400 transition-all" style={{ width: `${charTotal > 0 ? (charStats.learning / charTotal) * 100 : 0}%` }} />
-              <div className="bg-gray-200 transition-all flex-1" />
-            </div>
-            <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>已掌握 {charStats.mastered}</span>
-              <span>学习中 {charStats.learning}</span>
-              <span>未接触 {charStats.new}</span>
-            </div>
+          <div className="flex justify-between text-xs mt-2">
+            <span className="text-green-600">✓ {wordStats.mastered} 已掌握</span>
+            <span className="text-amber-600">📖 {wordStats.learning} 学习中</span>
+            <span className="text-gray-500">🆕 {wordStats.new} 新词</span>
           </div>
-
-          {/* Weak chars reminder */}
-          {weakChars.length > 0 && (
-            <div className="mt-4 p-3 bg-red-50 rounded-2xl border border-red-200">
-              <div className="text-sm font-bold text-red-600 mb-1">
-                ⚠️ 需要复习的字 ({weakChars.length})
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {weakChars.slice(0, 10).map(ch => (
-                  <span key={ch} className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">
-                    {ch}
-                  </span>
-                ))}
-                {weakChars.length > 10 && (
-                  <span className="text-xs text-red-400 self-center">+{weakChars.length - 10} 个</span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Quick Links */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => router.push('/achievement')}
-            className="bg-white rounded-2xl p-4 text-center shadow-sm shadow-amber-100 hover:shadow-md transition-all active:scale-[0.98]"
-          >
-            <div className="text-2xl mb-1">🏅</div>
-            <div className="text-sm font-bold text-gray-700">成就徽章</div>
-          </button>
-          <button
-            onClick={() => router.push('/parent-report')}
-            className="bg-white rounded-2xl p-4 text-center shadow-sm shadow-amber-100 hover:shadow-md transition-all active:scale-[0.98]"
-          >
-            <div className="text-2xl mb-1">📊</div>
-            <div className="text-sm font-bold text-gray-700">学习报告</div>
-          </button>
+        {/* Character mastery */}
+        <div className="bg-white rounded-3xl shadow-lg shadow-amber-100 p-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-3">🔤 汉字掌握</h2>
+          <div className="flex items-center gap-4">
+            <div className="relative w-20 h-20">
+              <svg className="w-20 h-20 -rotate-90" viewBox="0 0 72 72">
+                <circle cx="36" cy="36" r="30" fill="none" stroke="#f3f4f6" strokeWidth="6" />
+                <circle cx="36" cy="36" r="30" fill="none" stroke="#f59e0b" strokeWidth="6"
+                  strokeDasharray={`${charProgress * 1.88} 188`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center font-bold text-lg text-amber-600">
+                {charProgress}%
+              </span>
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-green-400 shrink-0" />
+                <span className="text-sm text-gray-600">{charStats.mastered} 字已掌握</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-sm text-gray-600">{charStats.learning} 字学习中</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-gray-300 shrink-0" />
+                <span className="text-sm text-gray-600">{charStats.new} 字未学</span>
+              </div>
+              {weakCharCount > 0 && (
+                <div className="text-sm text-red-500 font-medium">
+                  ⚠️ {weakCharCount} 个弱字需要复习
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation buttons */}
+        <div className="space-y-3">
           <button
             onClick={() => router.push('/settings')}
-            className="bg-white rounded-2xl p-4 text-center shadow-sm shadow-amber-100 hover:shadow-md transition-all active:scale-[0.98]"
+            className="w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-md shadow-amber-100 hover:bg-amber-50 transition-colors text-left"
           >
-            <div className="text-2xl mb-1">⚙️</div>
-            <div className="text-sm font-bold text-gray-700">偏好设置</div>
+            <span className="text-2xl">⚙️</span>
+            <div>
+              <div className="font-bold text-gray-800">偏好设置</div>
+              <div className="text-xs text-gray-500">HSK 级别、兴趣、弱字管理</div>
+            </div>
+            <span className="ml-auto text-gray-400">→</span>
           </button>
+
           <button
             onClick={() => router.push('/account')}
-            className="bg-white rounded-2xl p-4 text-center shadow-sm shadow-amber-100 hover:shadow-md transition-all active:scale-[0.98]"
+            className="w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-md shadow-amber-100 hover:bg-amber-50 transition-colors text-left"
           >
-            <div className="text-2xl mb-1">👤</div>
-            <div className="text-sm font-bold text-gray-700">账户信息</div>
+            <span className="text-2xl">🔑</span>
+            <div>
+              <div className="font-bold text-gray-800">账户信息</div>
+              <div className="text-xs text-gray-500">邮箱、头像、退出登录</div>
+            </div>
+            <span className="ml-auto text-gray-400">→</span>
+          </button>
+
+          <button
+            onClick={() => router.push('/daily')}
+            className="w-full bg-gradient-to-r from-amber-400 to-orange-400 text-white rounded-2xl p-4 flex items-center gap-4 shadow-lg hover:from-amber-500 hover:to-orange-500 transition-all text-left"
+          >
+            <span className="text-2xl">📖</span>
+            <div>
+              <div className="font-bold">今日阅读</div>
+              <div className="text-xs text-white/80">继续学习</div>
+            </div>
+            <span className="ml-auto">→</span>
           </button>
         </div>
-
-        {/* Back to reading */}
-        <button
-          onClick={() => router.push('/daily')}
-          className="w-full bg-gradient-to-r from-amber-400 to-orange-400 text-white font-bold py-3 rounded-2xl hover:from-amber-500 hover:to-orange-500 transition-all shadow-md active:scale-[0.98]"
-        >
-          📖 继续阅读
-        </button>
       </div>
-    </div>
+    </AppLayout>
   );
 }

@@ -268,9 +268,11 @@ function getSentenceForWord(word: string, ctx: StoryContext): string {
 
   // 14. Vehicles / transport
   if (ALL_VEHICLES.includes(word)) {
+    const isAirVehicle = word === '飞机' || word === '风筝';
+    const passBy = isAirVehicle ? '飞过' : '开过';
     const templates = [
       ` ${p}坐上了${word}，心里又激动又期待。`,
-      ` 一辆${word}从${p}身边开过，${p}好奇地盯着看。`,
+      ` 一辆${word}从${p}身边${passBy}，${p}好奇地盯着看。`,
       ` ${p}最喜欢${word}了，每次看到都特别兴奋。`,
       ` "${word}来了！"${p}大声喊道。`,
     ];
@@ -372,49 +374,88 @@ function getSentenceForWord(word: string, ctx: StoryContext): string {
   }
 
   // 24. Default — multi-character word, unknown category
-  // Use richer, more natural templates instead of the old mechanical ones
-  const templates = [
-    ` 说起${word}，${p}总是滔滔不绝。`,
-    ` ${p}对${word}特别感兴趣。`,
-    ` "真不错的${word}！"${p}感叹道。`,
-    ` ${p}有一个${word}，非常珍惜它。`,
+  // Use safe, natural templates that work for ALL word types (nouns, verbs, adjectives, etc.)
+  const universalTemplates = [
+    ` ${p}觉得“${word}”这个说法很有用。`,
+    ` ${p}在书上看到了“${word}”这个词，读了好几遍。`,
+    ` ${p}想了想“${word}”的意思，点了点头。`,
+    ` “${word}”这个词，${p}今天学到了。`,
+    ` ${p}喜欢“${word}”这个字。`,
   ];
-  return randomPick(templates);
+  return randomPick(universalTemplates);
 }
 
 /**
  * Generate a natural paragraph that strings multiple target words together
  * in a coherent mini-story, rather than appending isolated sentences.
  */
-function buildWordParagraph(words: ChineseWord[], ctx: StoryContext): string {
+/**
+ * Build a short word-practice section that uses the SAME characters
+ * as the story template, not ctx.player.
+ */
+function buildWordParagraph(
+  words: ChineseWord[],
+  ctx: StoryContext,
+  template: StoryTemplate,
+): string {
   if (words.length === 0) return '';
 
-  // For 1 word, just use getSentenceForWord
   if (words.length === 1) {
     return getSentenceForWord(words[0].word, ctx);
   }
 
-  // For 2+ words, create a coherent short paragraph
-  const p = ctx.player;
-  const f = ctx.friend;
+  // Determine the main character name that was actually used in the story.
+  // For animal-titled templates (森林里的比赛 etc.) use the animal names;
+  // for player-based templates use ctx.player.
+  const templateTitle = template.title || '';
+  const isAnimalStory = templateTitle.includes('森林') || templateTitle.includes('动物');
+  const p = isAnimalStory ? ctx.animal : ctx.player;
+  const f = isAnimalStory ? ctx.animal2 : ctx.friend;
+
   const sentences: string[] = [];
 
-  // First word: use a transition-like opening
-  const firstWord = words[0].word;
-  const firstSent = getSentenceForWord(firstWord, ctx).trim();
-  sentences.push(`${p}今天学到了很多东西。`);
+  // Pick an opening line that fits the template theme, not a generic "学到了"
+  const openingTemplates: Record<string, string[]> = {
+    animal: [
+      `今天真开心！${p}和${f}都学到了新本领。`,
+      `${p}高兴地跳了起来，${f}也在旁边笑着。`,
+      `大家都很高兴，${p}说：\"我们明天还要一起玩！\"`,
+    ],
+    player: [
+      `${p}觉得今天特别有意思，学到了很多新东西。`,
+      `${p}开心地想着今天发生的事，脸上露出了笑容。`,
+      `${p}回到家，把今天的经历告诉了${f}。`,
+    ],
+  };
+  const openings = isAnimalStory ? openingTemplates.animal : openingTemplates.player;
+  sentences.push(randomPick(openings));
 
-  // Add each word's sentence — getSentenceForWord already uses the player name
+  // Add each word's sentence — getSentenceForWord still uses ctx internally,
+  // but we swap the display name so the paragraph reads consistently.
   for (const w of words) {
-    sentences.push(getSentenceForWord(w.word, ctx).trim());
+    let sentence = getSentenceForWord(w.word, ctx).trim();
+    // Replace ctx.player/friend references with our chosen character name
+    if (p !== ctx.player && ctx.player) {
+      sentence = sentence.replace(new RegExp(ctx.player, 'g'), p);
+    }
+    if (f !== ctx.friend && ctx.friend && f !== p) {
+      sentence = sentence.replace(new RegExp(ctx.friend, 'g'), f);
+    }
+    sentences.push(` ${sentence}`);
   }
 
   // Closing sentence for natural wrap-up
-  const closingTemplates = [
-    ` ${p}觉得今天过得真有意义。`,
-    ` "${p}真厉害！"${f}夸奖道。`,
-    ` ${p}开心地笑了起来。`,
-  ];
+  const closingTemplates = isAnimalStory
+    ? [
+        ` ${p}和大家告别，蹦蹦跳跳地回家了。`,
+        ` \"明天见！\"${p}对${f}喊道。`,
+        ` 太阳下山了，${p}和${f}也回家了。`,
+      ]
+    : [
+        ` ${p}觉得今天过得真有意义。`,
+        ` \"今天真棒！\"${p}笑着说。`,
+        ` ${p}开心地笑了起来。`,
+      ];
   sentences.push(randomPick(closingTemplates));
 
   return sentences.join('');
@@ -467,18 +508,21 @@ export function generateFallbackArticle(
     .replace(/{concept}/g, ctx.concept);
 
   // Step 3: Build a coherent word-practice paragraph
-  const wordParagraph = buildWordParagraph(newWords, ctx);
+  const wordParagraph = buildWordParagraph(newWords, ctx, template);
 
-  // Step 4: Build weak char sentences
+  // Step 4: Build weak char sentences — use same character as story
   let charSentences = '';
+  const charForTemplates = template.title.includes('森林') || template.title.includes('动物')
+    ? ctx.animal
+    : ctx.player;
   if (weakChars.length > 0) {
     const chars = weakChars.slice(0, 3);
     for (const ch of chars) {
       const charTemplates = [
-        ` ${ctx.player}在纸上写了一个大大的"${ch}"字。`,
-        ` "这个字是'${ch}'。"${ctx.player}指着书说。`,
-        ` ${ctx.player}仔细看了看"${ch}"字，记住了它的样子。`,
-        ` "${ch}字真有趣！"${ctx.player}笑着说。`,
+        ` ${charForTemplates}在纸上写了一个大大的"${ch}"字。`,
+        ` "这个字是'${ch}'。"${charForTemplates}指着书说。`,
+        ` ${charForTemplates}仔细看了看"${ch}"字，记住了它的样子。`,
+        ` "${ch}字真有趣！"${charForTemplates}笑着说。`,
       ];
       charSentences += randomPick(charTemplates);
     }
